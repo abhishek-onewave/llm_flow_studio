@@ -1,0 +1,25 @@
+import type { ModelProvider, ModelRecord } from "@/types/models";
+
+export const mockProviders: ModelProvider[] = [
+  { id: "openai", name: "OpenAI", description: "GPT-4o, GPT-4o mini, o1, o3", iconSlug: "openai", website: "https://openai.com", isConfigured: true, modelCount: 4 },
+  { id: "anthropic", name: "Anthropic", description: "Claude Opus, Sonnet, Haiku", iconSlug: "anthropic", website: "https://anthropic.com", isConfigured: true, modelCount: 3 },
+  { id: "google", name: "Google", description: "Gemini 2.5 Pro, Flash", iconSlug: "google", website: "https://ai.google.dev", isConfigured: false, modelCount: 2 },
+  { id: "mistral", name: "Mistral", description: "Mistral Large, Medium, Small", iconSlug: "mistral", website: "https://mistral.ai", isConfigured: false, modelCount: 3 },
+  { id: "openrouter", name: "OpenRouter", description: "Access 100+ models via one API", iconSlug: "openrouter", website: "https://openrouter.ai", isConfigured: false, modelCount: 0 },
+  { id: "custom", name: "Custom", description: "Bring your own OpenAI-compatible endpoint", iconSlug: "custom", website: "", isConfigured: false, modelCount: 0 },
+];
+
+export const mockModels: ModelRecord[] = [
+  { id: "gpt-4o", provider: "openai", name: "gpt-4o", displayName: "GPT-4o", description: "Flagship multimodal model", contextWindow: 128000, maxOutput: 16384, inputPricePer1k: 0.0025, outputPricePer1k: 0.01, capabilities: ["text", "vision", "function_calling", "json_mode", "streaming", "code"], isDefault: true },
+  { id: "gpt-4o-mini", provider: "openai", name: "gpt-4o-mini", displayName: "GPT-4o Mini", description: "Fast and cost-efficient", contextWindow: 128000, maxOutput: 16384, inputPricePer1k: 0.00015, outputPricePer1k: 0.0006, capabilities: ["text", "vision", "function_calling", "json_mode", "streaming", "code"], isDefault: false },
+  { id: "o3", provider: "openai", name: "o3", displayName: "o3", description: "Advanced reasoning model", contextWindow: 200000, maxOutput: 100000, inputPricePer1k: 0.01, outputPricePer1k: 0.04, capabilities: ["text", "function_calling", "streaming", "code"], isDefault: false },
+  { id: "o4-mini", provider: "openai", name: "o4-mini", displayName: "o4-mini", description: "Fast reasoning model", contextWindow: 200000, maxOutput: 100000, inputPricePer1k: 0.0011, outputPricePer1k: 0.0044, capabilities: ["text", "function_calling", "streaming", "code"], isDefault: false },
+  { id: "claude-opus-4", provider: "anthropic", name: "claude-opus-4-20250514", displayName: "Claude Opus 4", description: "Most capable Claude model", contextWindow: 200000, maxOutput: 32000, inputPricePer1k: 0.015, outputPricePer1k: 0.075, capabilities: ["text", "vision", "function_calling", "streaming", "code"], isDefault: false },
+  { id: "claude-sonnet-4", provider: "anthropic", name: "claude-sonnet-4-20250514", displayName: "Claude Sonnet 4", description: "Balanced intelligence and speed", contextWindow: 200000, maxOutput: 16000, inputPricePer1k: 0.003, outputPricePer1k: 0.015, capabilities: ["text", "vision", "function_calling", "streaming", "code"], isDefault: true },
+  { id: "claude-haiku-35", provider: "anthropic", name: "claude-3-5-haiku-20241022", displayName: "Claude 3.5 Haiku", description: "Fast and affordable", contextWindow: 200000, maxOutput: 8192, inputPricePer1k: 0.0008, outputPricePer1k: 0.004, capabilities: ["text", "vision", "function_calling", "streaming", "code"], isDefault: false },
+  { id: "gemini-25-pro", provider: "google", name: "gemini-2.5-pro", displayName: "Gemini 2.5 Pro", description: "Advanced reasoning with thinking", contextWindow: 1048576, maxOutput: 65536, inputPricePer1k: 0.00125, outputPricePer1k: 0.01, capabilities: ["text", "vision", "function_calling", "json_mode", "streaming", "code"], isDefault: true },
+  { id: "gemini-25-flash", provider: "google", name: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash", description: "Speed-optimized with thinking", contextWindow: 1048576, maxOutput: 65536, inputPricePer1k: 0.00015, outputPricePer1k: 0.0006, capabilities: ["text", "vision", "function_calling", "json_mode", "streaming", "code"], isDefault: false },
+  { id: "mistral-large", provider: "mistral", name: "mistral-large-latest", displayName: "Mistral Large", description: "Top-tier reasoning", contextWindow: 128000, maxOutput: 8192, inputPricePer1k: 0.002, outputPricePer1k: 0.006, capabilities: ["text", "function_calling", "json_mode", "streaming", "code"], isDefault: true },
+  { id: "mistral-medium", provider: "mistral", name: "mistral-medium-latest", displayName: "Mistral Medium", description: "Balanced performance", contextWindow: 128000, maxOutput: 8192, inputPricePer1k: 0.0027, outputPricePer1k: 0.0081, capabilities: ["text", "function_calling", "streaming"], isDefault: false },
+  { id: "mistral-small", provider: "mistral", name: "mistral-small-latest", displayName: "Mistral Small", description: "Cost-efficient", contextWindow: 128000, maxOutput: 8192, inputPricePer1k: 0.0002, outputPricePer1k: 0.0006, capabilities: ["text", "function_calling", "streaming"], isDefault: false },
+];
