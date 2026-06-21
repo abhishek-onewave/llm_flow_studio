@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useReducer } from "react";
 import {
   Bot,
   Sparkles,
@@ -20,63 +20,48 @@ import {
   ShieldAlert,
   ToggleLeft,
   Ban,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MascotPlaceholder } from "@/components/ui/mascot-placeholder";
+import { createClient } from "@/lib/supabase/client";
 
 /* ------------------------------------------------------------------ */
-/*  Mock data (generic names per spec)                                 */
+/*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-interface Provider {
+const DEMO_WORKSPACE_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface ProviderRow {
   id: string;
   name: string;
   description: string;
-  iconSlug: string;
-  connected: boolean;
-  modelCount: number;
+  icon_slug: string;
+  website: string;
 }
 
-const providers: Provider[] = [
-  { id: "openai", name: "OpenAI", description: "Chat, reasoning, and embedding models", iconSlug: "openai", connected: true, modelCount: 4 },
-  { id: "anthropic", name: "Anthropic", description: "Claude reasoning and assistant models", iconSlug: "anthropic", connected: true, modelCount: 3 },
-  { id: "google", name: "Google Gemini", description: "Multimodal and Flash models", iconSlug: "google", connected: true, modelCount: 2 },
-  { id: "mistral", name: "Mistral", description: "European open-weight models", iconSlug: "mistral", connected: false, modelCount: 0 },
-  { id: "openrouter", name: "OpenRouter", description: "Unified API for 100+ models", iconSlug: "openrouter", connected: true, modelCount: 0 },
-  { id: "custom", name: "Custom Endpoint", description: "OpenAI-compatible endpoint", iconSlug: "custom", connected: false, modelCount: 0 },
-];
-
-interface MockModel {
+interface ModelRow {
   id: string;
+  provider_id: string;
   name: string;
-  provider: string;
-  contextWindow: string;
-  inputPrice: string;
-  outputPrice: string;
-  hasTools: boolean;
-  hasVision: boolean;
-  hasText: boolean;
-  hasJson: boolean;
-  hasReasoning: boolean;
-  status: "active" | "deprecated";
-  allowed: boolean;
-  isDefault: boolean;
+  display_name: string;
+  description: string;
+  context_window: number;
+  max_output: number;
+  input_price_per_1k: number;
+  output_price_per_1k: number;
+  capabilities: string[];
+  status: string;
 }
 
-const models: MockModel[] = [
-  { id: "m1", name: "Latest OpenAI chat model", provider: "OpenAI", contextWindow: "128K", inputPrice: "$2.50", outputPrice: "$10.00", hasTools: true, hasVision: true, hasText: true, hasJson: true, hasReasoning: false, status: "active", allowed: true, isDefault: true },
-  { id: "m2", name: "OpenAI fast chat model", provider: "OpenAI", contextWindow: "128K", inputPrice: "$0.15", outputPrice: "$0.60", hasTools: true, hasVision: true, hasText: true, hasJson: true, hasReasoning: false, status: "active", allowed: true, isDefault: false },
-  { id: "m3", name: "OpenAI reasoning model", provider: "OpenAI", contextWindow: "200K", inputPrice: "$10.00", outputPrice: "$40.00", hasTools: true, hasVision: false, hasText: true, hasJson: false, hasReasoning: true, status: "active", allowed: true, isDefault: false },
-  { id: "m4", name: "OpenAI fast reasoning model", provider: "OpenAI", contextWindow: "200K", inputPrice: "$1.10", outputPrice: "$4.40", hasTools: true, hasVision: false, hasText: true, hasJson: false, hasReasoning: true, status: "active", allowed: true, isDefault: false },
-  { id: "m5", name: "Latest Claude reasoning model", provider: "Anthropic", contextWindow: "200K", inputPrice: "$15.00", outputPrice: "$75.00", hasTools: true, hasVision: true, hasText: true, hasJson: false, hasReasoning: true, status: "active", allowed: true, isDefault: false },
-  { id: "m6", name: "Claude balanced model", provider: "Anthropic", contextWindow: "200K", inputPrice: "$3.00", outputPrice: "$15.00", hasTools: true, hasVision: true, hasText: true, hasJson: false, hasReasoning: false, status: "active", allowed: true, isDefault: false },
-  { id: "m7", name: "Claude fast model", provider: "Anthropic", contextWindow: "200K", inputPrice: "$0.80", outputPrice: "$4.00", hasTools: true, hasVision: true, hasText: true, hasJson: false, hasReasoning: false, status: "active", allowed: true, isDefault: false },
-  { id: "m8", name: "Latest Gemini multimodal model", provider: "Google Gemini", contextWindow: "1M", inputPrice: "$1.25", outputPrice: "$10.00", hasTools: true, hasVision: true, hasText: true, hasJson: true, hasReasoning: true, status: "active", allowed: true, isDefault: false },
-  { id: "m9", name: "Gemini fast model", provider: "Google Gemini", contextWindow: "1M", inputPrice: "$0.15", outputPrice: "$0.60", hasTools: true, hasVision: true, hasText: true, hasJson: true, hasReasoning: false, status: "active", allowed: true, isDefault: false },
-  { id: "m10", name: "Mistral large model", provider: "Mistral", contextWindow: "128K", inputPrice: "$2.00", outputPrice: "$6.00", hasTools: true, hasVision: false, hasText: true, hasJson: true, hasReasoning: false, status: "active", allowed: false, isDefault: false },
-  { id: "m11", name: "OpenRouter aggregated model", provider: "OpenRouter", contextWindow: "128K", inputPrice: "varies", outputPrice: "varies", hasTools: true, hasVision: false, hasText: true, hasJson: false, hasReasoning: false, status: "active", allowed: true, isDefault: false },
-  { id: "m12", name: "Legacy OpenAI chat model", provider: "OpenAI", contextWindow: "8K", inputPrice: "$30.00", outputPrice: "$60.00", hasTools: true, hasVision: false, hasText: true, hasJson: false, hasReasoning: false, status: "deprecated", allowed: false, isDefault: false },
-];
+interface WorkspaceProviderRow {
+  provider_id: string;
+  is_enabled: boolean;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Icon / color maps                                                  */
@@ -106,19 +91,131 @@ function CapChip({ label, active }: { label: string; active: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function formatContext(ctx: number): string {
+  if (ctx >= 1_000_000) return `${(ctx / 1_000_000).toFixed(0)}M`;
+  if (ctx >= 1_000) return `${(ctx / 1_000).toFixed(0)}K`;
+  return String(ctx);
+}
+
+function formatPrice(price: number): string {
+  if (price === 0) return "$0";
+  if (price < 0.001) return `$${price.toFixed(4)}`;
+  return `$${price.toFixed(2)}`;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function ModelsPage() {
-  const [defaultModelId, setDefaultModelId] = useState(() => models.find((m) => m.isDefault)?.id ?? models[0].id);
+  const [refreshKey, refresh] = useReducer((x: number) => x + 1, 0);
+  const [providers, setProviders] = useState<ProviderRow[]>([]);
+  const [models, setModels] = useState<ModelRow[]>([]);
+  const [connectedMap, setConnectedMap] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const [defaultModelId, setDefaultModelId] = useState<string>("");
   const [budget, setBudget] = useState("500");
   const [requireApproval, setRequireApproval] = useState(false);
   const [disableDeprecated, setDisableDeprecated] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  // Fetch providers, models, and workspace connection state
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const supabase = createClient();
+
+      const [provRes, modRes, wpRes] = await Promise.all([
+        supabase.from("model_providers").select("*").order("name"),
+        supabase.from("models").select("*").order("provider_id, display_name"),
+        supabase
+          .from("workspace_providers")
+          .select("provider_id, is_enabled")
+          .eq("workspace_id", DEMO_WORKSPACE_ID),
+      ]);
+
+      if (cancelled) return;
+
+      if (provRes.data) setProviders(provRes.data as ProviderRow[]);
+      if (modRes.data) {
+        const mods = modRes.data as ModelRow[];
+        setModels(mods);
+        setDefaultModelId((prev) => prev || mods[0]?.id || "");
+      }
+      if (wpRes.data) {
+        const map: Record<string, boolean> = {};
+        (wpRes.data as WorkspaceProviderRow[]).forEach((row) => {
+          map[row.provider_id] = row.is_enabled;
+        });
+        setConnectedMap(map);
+      }
+
+      setLoading(false);
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  // Toggle provider connection
+  const toggleProvider = async (providerId: string) => {
+    setTogglingId(providerId);
+    const supabase = createClient();
+    const currentlyEnabled = connectedMap[providerId] ?? false;
+    const newEnabled = !currentlyEnabled;
+
+    if (currentlyEnabled) {
+      // Disable: delete the row
+      await supabase
+        .from("workspace_providers")
+        .delete()
+        .eq("workspace_id", DEMO_WORKSPACE_ID)
+        .eq("provider_id", providerId);
+    } else {
+      // Enable: upsert
+      await supabase.from("workspace_providers").upsert(
+        {
+          workspace_id: DEMO_WORKSPACE_ID,
+          provider_id: providerId,
+          is_enabled: true,
+          api_key_set: false,
+        },
+        { onConflict: "workspace_id,provider_id" },
+      );
+    }
+
+    setConnectedMap((prev) => {
+      const next = { ...prev };
+      if (newEnabled) {
+        next[providerId] = true;
+      } else {
+        delete next[providerId];
+      }
+      return next;
+    });
+    setTogglingId(null);
+  };
+
   const activeModels = models.filter((m) => m.status === "active");
   const deprecatedModels = models.filter((m) => m.status === "deprecated");
-  const connectedCount = providers.filter((p) => p.connected).length;
+  const connectedCount = Object.keys(connectedMap).length;
+
+  const hasCapability = (m: ModelRow, cap: string) => m.capabilities.includes(cap);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-5 w-5 animate-spin text-mute" />
+        <span className="ml-2 text-sm text-mute">Loading models...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -132,7 +229,10 @@ export default function ModelsPage() {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button className="inline-flex h-10 items-center gap-1.5 rounded-md border border-hairline px-3 text-xs font-medium text-body transition-colors hover:bg-surface-soft hover:text-ink sm:h-8">
+          <button
+            onClick={() => { setLoading(true); refresh(); }}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-hairline px-3 text-xs font-medium text-body transition-colors hover:bg-surface-soft hover:text-ink sm:h-8"
+          >
             <RefreshCw className="h-3.5 w-3.5" />
             Sync model registry
           </button>
@@ -152,8 +252,10 @@ export default function ModelsPage() {
           </div>
           <div className="grid grid-cols-2 gap-0 sm:grid-cols-3">
             {providers.map((p, i) => {
-              const Icon = providerIcons[p.iconSlug] ?? Bot;
-              const color = providerColors[p.iconSlug] ?? "#6c6e63";
+              const Icon = providerIcons[p.icon_slug] ?? Bot;
+              const color = providerColors[p.icon_slug] ?? "#6c6e63";
+              const isConnected = connectedMap[p.id] ?? false;
+              const isToggling = togglingId === p.id;
               return (
                 <div
                   key={p.id}
@@ -168,7 +270,7 @@ export default function ModelsPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold text-ink">{p.name}</p>
-                    {p.connected ? (
+                    {isConnected ? (
                       <span className="flex items-center gap-1 text-[10px] font-medium text-accent-green">
                         <Check className="h-2.5 w-2.5" /> Connected
                       </span>
@@ -176,6 +278,23 @@ export default function ModelsPage() {
                       <span className="text-[10px] text-mute">Not connected</span>
                     )}
                   </div>
+                  <button
+                    onClick={() => toggleProvider(p.id)}
+                    disabled={isToggling}
+                    className={cn(
+                      "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+                      isConnected ? "bg-accent-green" : "bg-hairline",
+                      isToggling && "opacity-50",
+                    )}
+                    role="switch"
+                    aria-checked={isConnected}
+                    aria-label={`Toggle ${p.name}`}
+                  >
+                    <span className={cn(
+                      "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform",
+                      isConnected ? "left-[18px]" : "left-0.5",
+                    )} />
+                  </button>
                 </div>
               );
             })}
@@ -193,7 +312,7 @@ export default function ModelsPage() {
           <div className="divide-y divide-hairline-soft">
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-[11px] text-mute">Last sync</span>
-              <span className="font-mono text-[11px] text-body">2 min ago</span>
+              <span className="font-mono text-[11px] text-body">Just now</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-[11px] text-mute">Active models</span>
@@ -235,39 +354,44 @@ export default function ModelsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline-soft">
-              {models.map((m) => (
-                <tr key={m.id} className={cn("transition-colors hover:bg-surface-soft/30", m.status === "deprecated" && "opacity-60")}>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-medium text-ink">{m.name}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-body">{m.provider}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-body">{m.contextWindow}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-body">{m.inputPrice}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-body">{m.outputPrice}</td>
-                  <td className="px-4 py-2.5 text-center"><CapChip label="Text" active={m.hasText} /></td>
-                  <td className="px-4 py-2.5 text-center"><CapChip label="Vision" active={m.hasVision} /></td>
-                  <td className="px-4 py-2.5 text-center"><CapChip label="Tools" active={m.hasTools} /></td>
-                  <td className="px-4 py-2.5 text-center"><CapChip label="Reasoning" active={m.hasReasoning} /></td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
-                    <span className={cn(
-                      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                      m.status === "active" ? "bg-accent-green-soft text-accent-green" : "bg-accent-red-soft text-accent-red",
-                    )}>
-                      {m.status === "active" ? "Active" : "Deprecated"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    {m.allowed ? (
-                      <Check className="mx-auto h-3.5 w-3.5 text-accent-green" />
-                    ) : (
-                      <Ban className="mx-auto h-3.5 w-3.5 text-stone" />
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    <button onClick={() => setDefaultModelId(m.id)} title={m.id === defaultModelId ? "Default model" : "Set as default"}>
-                      <Star className={cn("h-3.5 w-3.5 transition-colors", m.id === defaultModelId ? "fill-primary-cta text-primary-cta" : "text-hairline hover:text-primary-cta")} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {models.map((m) => {
+                const providerConnected = connectedMap[m.provider_id] ?? false;
+                return (
+                  <tr key={m.id} className={cn("transition-colors hover:bg-surface-soft/30", m.status === "deprecated" && "opacity-60")}>
+                    <td className="whitespace-nowrap px-4 py-2.5 font-medium text-ink">{m.display_name}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-body">
+                      {providers.find((p) => p.id === m.provider_id)?.name ?? m.provider_id}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 font-mono text-body">{formatContext(m.context_window)}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 font-mono text-body">{formatPrice(m.input_price_per_1k)}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 font-mono text-body">{formatPrice(m.output_price_per_1k)}</td>
+                    <td className="px-4 py-2.5 text-center"><CapChip label="Text" active={hasCapability(m, "text")} /></td>
+                    <td className="px-4 py-2.5 text-center"><CapChip label="Vision" active={hasCapability(m, "vision")} /></td>
+                    <td className="px-4 py-2.5 text-center"><CapChip label="Tools" active={hasCapability(m, "function_calling")} /></td>
+                    <td className="px-4 py-2.5 text-center"><CapChip label="Reasoning" active={hasCapability(m, "streaming")} /></td>
+                    <td className="whitespace-nowrap px-4 py-2.5">
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        m.status === "active" ? "bg-accent-green-soft text-accent-green" : "bg-accent-red-soft text-accent-red",
+                      )}>
+                        {m.status === "active" ? "Active" : "Deprecated"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      {providerConnected ? (
+                        <Check className="mx-auto h-3.5 w-3.5 text-accent-green" />
+                      ) : (
+                        <Ban className="mx-auto h-3.5 w-3.5 text-stone" />
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <button onClick={() => setDefaultModelId(m.id)} title={m.id === defaultModelId ? "Default model" : "Set as default"}>
+                        <Star className={cn("h-3.5 w-3.5 transition-colors", m.id === defaultModelId ? "fill-primary-cta text-primary-cta" : "text-hairline hover:text-primary-cta")} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -284,14 +408,14 @@ export default function ModelsPage() {
             <label id="default-model-label" className="block text-xs font-medium text-ink">Default Model</label>
             <div className="relative mt-1.5">
               <button type="button" aria-label="Default model" aria-expanded={dropdownOpen} onClick={() => setDropdownOpen(!dropdownOpen)} className="flex w-full items-center justify-between rounded-md border border-hairline bg-white px-3 py-2 text-xs text-ink transition-colors hover:border-mute">
-                <span>{models.find((m) => m.id === defaultModelId)?.name ?? "Select"}</span>
+                <span>{models.find((m) => m.id === defaultModelId)?.display_name ?? "Select"}</span>
                 <ChevronDown className="h-3.5 w-3.5 text-mute" />
               </button>
               {dropdownOpen && (
                 <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-hairline bg-surface-card">
                   {activeModels.map((m) => (
                     <button key={m.id} type="button" onClick={() => { setDefaultModelId(m.id); setDropdownOpen(false); }} className={cn("w-full px-3 py-2 text-left text-xs transition-colors hover:bg-surface-soft", m.id === defaultModelId ? "font-medium text-ink bg-surface-soft/50" : "text-body")}>
-                      {m.name} <span className="text-[10px] text-mute">({m.provider})</span>
+                      {m.display_name} <span className="text-[10px] text-mute">({providers.find((p) => p.id === m.provider_id)?.name})</span>
                     </button>
                   ))}
                 </div>
