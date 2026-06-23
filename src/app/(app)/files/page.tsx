@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MascotPlaceholder } from "@/components/ui/mascot-placeholder";
-import { mockFiles, mockCollections, mockFilePreview, type FileStatus } from "@/lib/mock/files";
+import { mockFiles, mockCollections, type FileStatus } from "@/lib/mock/files";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -61,17 +61,13 @@ function StatusChip({ status }: { status: FileStatus }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Selected file preview                                              */
-/* ------------------------------------------------------------------ */
-
-const selectedFile = mockFilePreview;
-
-/* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function FilesPage() {
   const [selectedFileId, setSelectedFileId] = useState("f1");
+
+  const selectedFile = mockFiles.find((f) => f.id === selectedFileId) ?? mockFiles[0];
 
   return (
     <div className="p-6">
@@ -208,31 +204,29 @@ export default function FilesPage() {
           <div className="rounded-md border border-hairline bg-surface-card p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase tracking-wider text-mute">File preview</h2>
-              <span className="rounded bg-surface-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase text-mute">PDF</span>
+              <span className="rounded bg-surface-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase text-mute">{selectedFile.type}</span>
             </div>
 
             <h3 className="mt-3 text-sm font-semibold text-ink">{selectedFile.name}</h3>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Pages</p>
-                <p className="text-xs font-semibold text-ink">{selectedFile.pages}</p>
+                <p className="text-[10px] text-mute">Size</p>
+                <p className="text-xs font-semibold text-ink">{selectedFile.size}</p>
               </div>
               <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Extracted text</p>
-                <p className="text-xs font-semibold text-ink">{selectedFile.extractedText}</p>
+                <p className="text-[10px] text-mute">Status</p>
+                <p className="text-xs font-semibold text-ink"><StatusChip status={selectedFile.status} /></p>
               </div>
               <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Embeddings</p>
-                <p className="flex items-center gap-1 text-xs font-semibold text-accent-green">
-                  <CheckCircle className="h-3 w-3" />
-                  {selectedFile.embeddingsStatus}
+                <p className="text-[10px] text-mute">Used in</p>
+                <p className="text-xs font-semibold text-ink">
+                  {selectedFile.usedIn.length > 0 ? selectedFile.usedIn.join(", ") : "None"}
                 </p>
-
               </div>
               <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Last used</p>
-                <p className="text-xs font-semibold text-ink">{selectedFile.lastUsed}</p>
+                <p className="text-[10px] text-mute">Uploaded</p>
+                <p className="text-xs font-semibold text-ink">{selectedFile.uploaded}</p>
               </div>
             </div>
 

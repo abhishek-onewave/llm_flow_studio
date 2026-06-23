@@ -120,7 +120,7 @@ function Callout({ variant, children }: { variant: CalloutVariant; children: Rea
     <div className={cn("flex items-start gap-3 rounded-md border-l-[3px] px-4 py-3", c.bg, c.border)}>
       <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", c.iconColor)} />
       <div>
-        <p className="text-[11px] font-bold text-ink">{c.label}</p>
+        <p className="text-xs font-bold text-ink">{c.label}</p>
         <p className="mt-0.5 text-sm leading-relaxed text-body">{children}</p>
       </div>
     </div>
@@ -133,7 +133,7 @@ function Callout({ variant, children }: { variant: CalloutVariant; children: Rea
 
 function InlineCode({ children }: { children: React.ReactNode }) {
   return (
-    <code className="rounded-[2px] bg-surface-soft px-1.5 py-0.5 font-mono text-[11px] font-medium text-ink">
+    <code className="rounded-[2px] bg-surface-soft px-1.5 py-0.5 font-mono text-xs font-medium text-ink">
       {children}
     </code>
   );
@@ -264,7 +264,7 @@ export default function DocsPage() {
         {/* ---- Section 1 ---- */}
         <section className="mt-8">
           <h2 id="create-workflow" className="text-lg font-bold text-ink">1. Create a workflow</h2>
-          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-5">
+          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-6">
             <p className="text-sm leading-relaxed text-body">
               From the dashboard, click <InlineCode>New Workflow</InlineCode>. Give it a name
               like &quot;Product Researcher&quot; and you&apos;ll land on the visual builder canvas with
@@ -276,7 +276,7 @@ export default function DocsPage() {
         {/* ---- Section 2 ---- */}
         <section className="mt-8">
           <h2 id="add-llm-node" className="text-lg font-bold text-ink">2. Add your first LLM node</h2>
-          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-5">
+          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-6">
             <p className="text-sm leading-relaxed text-body">
               Open the node palette on the left and drag an <strong>OpenAI</strong> node onto the canvas.
               The node will appear with a default configuration. You can also drag a <strong>Claude</strong> or
@@ -295,7 +295,7 @@ export default function DocsPage() {
         {/* ---- Section 3 ---- */}
         <section className="mt-8">
           <h2 id="connect-nodes" className="text-lg font-bold text-ink">3. Connect nodes with arrows</h2>
-          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-5">
+          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-6">
             <p className="text-sm leading-relaxed text-body">
               Click and drag from the output handle (right side) of one node to the input handle (left side)
               of another. The arrow defines data flow — the output of the first node becomes available as
@@ -307,7 +307,7 @@ export default function DocsPage() {
         {/* ---- Section 4 ---- */}
         <section className="mt-8">
           <h2 id="configure-instructions" className="text-lg font-bold text-ink">4. Configure instructions</h2>
-          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-5">
+          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-6">
             <p className="text-sm leading-relaxed text-body">
               Click any node to open the inspector on the right. Set the system prompt, user prompt template,
               model, temperature, and max tokens. Here&apos;s an example workflow configuration:
@@ -336,7 +336,7 @@ export default function DocsPage() {
         {/* ---- Section 5 ---- */}
         <section className="mt-8">
           <h2 id="run-workflow" className="text-lg font-bold text-ink">5. Run the workflow</h2>
-          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-5">
+          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-6">
             <p className="text-sm leading-relaxed text-body">
               Click <InlineCode>Run workflow</InlineCode> in the top toolbar. Nodes execute in topological order —
               each node waits for its upstream dependencies to complete before starting. You can watch
@@ -355,7 +355,7 @@ export default function DocsPage() {
         {/* ---- Section 6 ---- */}
         <section className="mt-8">
           <h2 id="inspect-outputs" className="text-lg font-bold text-ink">6. Inspect outputs</h2>
-          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-5">
+          <div className="mt-3 rounded-md border border-hairline bg-surface-doc p-6">
             <p className="text-sm leading-relaxed text-body">
               After a run completes, click any node to view its output in the inspector panel.
               The Output tab shows the generated text, the Logs tab shows timing and token usage,

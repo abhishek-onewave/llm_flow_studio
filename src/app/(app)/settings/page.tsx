@@ -224,7 +224,7 @@ function WorkspaceSection() {
         <p className="mt-0.5 text-xs text-mute">Configure your workspace name, slug, and default region.</p>
       </div>
 
-      <div className="rounded-md border border-hairline bg-surface-card p-5">
+      <div className="rounded-md border border-hairline bg-surface-card p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <FormLabel htmlFor="ws-name">Workspace name</FormLabel>
@@ -335,7 +335,7 @@ function UsageLimitsSection() {
         <p className="mt-0.5 text-xs text-mute">Set spending guardrails and concurrency limits for your workspace.</p>
       </div>
 
-      <div className="rounded-md border border-hairline bg-surface-card p-5">
+      <div className="rounded-md border border-hairline bg-surface-card p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <FormLabel htmlFor="budget">Monthly budget limit</FormLabel>
@@ -500,7 +500,7 @@ function BillingSection() {
         <p className="mt-0.5 text-xs text-mute">View your current plan, usage, and payment details.</p>
       </div>
 
-      <div className="rounded-md border border-hairline bg-surface-card p-5">
+      <div className="rounded-md border border-hairline bg-surface-card p-6">
         <div className="grid gap-5 sm:grid-cols-2">
           {/* Current plan */}
           <div>
