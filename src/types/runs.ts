@@ -8,6 +8,9 @@ export interface RunEvent {
   nodeLabel: string;
   type: "started" | "output_chunk" | "completed" | "error" | "skipped";
   message: string;
+  tokens?: number;
+  durationMs?: number;
+  cost?: number;
 }
 
 /** Execution record for one node within a run */

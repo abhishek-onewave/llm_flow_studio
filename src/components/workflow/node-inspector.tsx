@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/lib/workflow/store";
-import { runSingleNode, runDownstream, pauseRun, stopRun } from "@/lib/workflow/mock-runner";
+import { runSingleNode, runDownstream, pauseRun, stopRun } from "@/lib/workflow/runner";
 
 /* ------------------------------------------------------------------ */
 /*  Mock option lists                                                   */

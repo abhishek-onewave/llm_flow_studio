@@ -10,15 +10,19 @@ import {
   RunConsole,
 } from "@/components/workflow";
 import { useWorkflowStore } from "@/lib/workflow/store";
+import { setWorkspaceId } from "@/lib/workflow/runner";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 
 export default function WorkflowBuilderPage() {
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
   const load = useWorkflowStore((s) => s.loadFromLocalStorage);
+  const { workspaceId } = useWorkspace();
 
   const [showPalette, setShowPalette] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (workspaceId) setWorkspaceId(workspaceId); }, [workspaceId]);
 
   const closePalette = useCallback(() => setShowPalette(false), []);
   const closeInspector = useCallback(() => setShowInspector(false), []);

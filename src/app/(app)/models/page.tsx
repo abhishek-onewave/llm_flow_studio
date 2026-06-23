@@ -25,12 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MascotPlaceholder } from "@/components/ui/mascot-placeholder";
 import { createClient } from "@/lib/supabase/client";
-
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const DEMO_WORKSPACE_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -111,6 +106,7 @@ function formatPrice(price: number): string {
 /* ------------------------------------------------------------------ */
 
 export default function ModelsPage() {
+  const { workspaceId, loading: wsLoading } = useWorkspace();
   const [refreshKey, refresh] = useReducer((x: number) => x + 1, 0);
   const [providers, setProviders] = useState<ProviderRow[]>([]);
   const [models, setModels] = useState<ModelRow[]>([]);
@@ -126,6 +122,7 @@ export default function ModelsPage() {
 
   // Fetch providers, models, and workspace connection state
   useEffect(() => {
+    if (wsLoading || !workspaceId) return;
     let cancelled = false;
 
     async function load() {
@@ -137,7 +134,7 @@ export default function ModelsPage() {
         supabase
           .from("workspace_providers")
           .select("provider_id, is_enabled")
-          .eq("workspace_id", DEMO_WORKSPACE_ID),
+          .eq("workspace_id", workspaceId),
       ]);
 
       if (cancelled) return;
@@ -161,10 +158,11 @@ export default function ModelsPage() {
 
     load();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, workspaceId, wsLoading]);
 
   // Toggle provider connection
   const toggleProvider = async (providerId: string) => {
+    if (!workspaceId) return;
     setTogglingId(providerId);
     const supabase = createClient();
     const currentlyEnabled = connectedMap[providerId] ?? false;
@@ -175,13 +173,13 @@ export default function ModelsPage() {
       await supabase
         .from("workspace_providers")
         .delete()
-        .eq("workspace_id", DEMO_WORKSPACE_ID)
+        .eq("workspace_id", workspaceId)
         .eq("provider_id", providerId);
     } else {
       // Enable: upsert
       await supabase.from("workspace_providers").upsert(
         {
-          workspace_id: DEMO_WORKSPACE_ID,
+          workspace_id: workspaceId,
           provider_id: providerId,
           is_enabled: true,
           api_key_set: false,
@@ -402,7 +400,7 @@ export default function ModelsPage() {
         <div className="border-b border-hairline-soft px-4 py-2.5">
           <h2 className="text-xs font-semibold text-ink">Model Policy</h2>
         </div>
-        <div className="max-w-lg space-y-5 p-5">
+        <div className="max-w-lg space-y-5 p-6">
           {/* Default model */}
           <div>
             <label id="default-model-label" className="block text-xs font-medium text-ink">Default Model</label>

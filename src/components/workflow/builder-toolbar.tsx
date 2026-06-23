@@ -11,7 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useWorkflowStore } from "@/lib/workflow/store";
-import { runWorkflow, pauseRun, resumeRun, stopRun } from "@/lib/workflow/mock-runner";
+import { runWorkflow, pauseRun, resumeRun, stopRun } from "@/lib/workflow/runner";
 import { cn } from "@/lib/utils";
 
 export function BuilderToolbar() {

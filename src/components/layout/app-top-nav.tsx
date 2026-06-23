@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Search, Bell, Menu } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, Bell, Menu, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
 
 const primaryNavItems = [
   { label: "Dashboard", href: "/dashboard" },
@@ -17,11 +19,26 @@ const primaryNavItems = [
 export function AppTopNav({
   onToggleSidebar,
   sidebarOpen,
+  userEmail,
+  workspaceName,
 }: {
   onToggleSidebar?: () => void;
   sidebarOpen?: boolean;
+  userEmail?: string | null;
+  workspaceName?: string | null;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  const initial = userEmail ? userEmail[0].toUpperCase() : "?";
 
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center border-b border-hairline bg-canvas px-4">
@@ -87,8 +104,41 @@ export function AppTopNav({
         >
           New workflow
         </Link>
-        {/* User avatar placeholder */}
-        <div className="ml-1 size-7 rounded-full bg-surface-soft border border-hairline" />
+
+        {/* User menu */}
+        <div className="relative ml-1">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="flex size-7 items-center justify-center rounded-full bg-primary-cta text-xs font-bold text-on-primary"
+            aria-label="User menu"
+            aria-expanded={menuOpen}
+          >
+            {initial}
+          </button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border border-hairline bg-surface-card py-1">
+                {userEmail && (
+                  <div className="border-b border-hairline-soft px-3 py-2">
+                    <p className="truncate text-xs font-medium text-ink">{userEmail}</p>
+                    {workspaceName && (
+                      <p className="truncate text-[10px] text-mute">{workspaceName}</p>
+                    )}
+                  </div>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-body transition-colors hover:bg-surface-soft hover:text-ink"
+                >
+                  <LogOut size={14} />
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
