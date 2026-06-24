@@ -32,7 +32,6 @@ function WorkflowCanvasInner() {
   const onConnect = useWorkflowStore((s) => s.onConnect);
   const selectNode = useWorkflowStore((s) => s.selectNode);
   const addNode = useWorkflowStore((s) => s.addNode);
-  const deleteNode = useWorkflowStore((s) => s.deleteNode);
   const saveToLocalStorage = useWorkflowStore((s) => s.saveToLocalStorage);
 
   const reactFlowInstance = useReactFlow();
@@ -106,8 +105,9 @@ function WorkflowCanvasInner() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={handleSelectionChange}
-        onNodesDelete={(deleted) => deleted.forEach((n) => deleteNode(n.id))}
         deleteKeyCode={["Backspace", "Delete"]}
+        selectionKeyCode={null}
+        multiSelectionKeyCode="Shift"
         fitView
         fitViewOptions={{ padding: 0.3 }}
         nodesDraggable
@@ -115,6 +115,7 @@ function WorkflowCanvasInner() {
         elementsSelectable
         edgesFocusable
         edgesReconnectable
+        selectNodesOnDrag={false}
         panOnDrag
         zoomOnScroll
         minZoom={0.3}
@@ -122,6 +123,10 @@ function WorkflowCanvasInner() {
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
           type: "smoothstep",
+          selectable: true,
+          deletable: true,
+          focusable: true,
+          interactionWidth: 20,
           style: { stroke: "#bfc1b7", strokeWidth: 1.5 },
           markerEnd: { type: MarkerType.ArrowClosed, color: "#bfc1b7", width: 16, height: 16 },
         }}
