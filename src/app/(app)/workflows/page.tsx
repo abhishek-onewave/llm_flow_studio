@@ -9,7 +9,7 @@ export default function WorkflowsPage() {
         title="Workflows"
         description="Manage your AI workflow pipelines."
         actions={
-          <Link href="/workflows/builder">
+          <Link href="/workflows/builder?new=1">
             <Button>New workflow</Button>
           </Link>
         }

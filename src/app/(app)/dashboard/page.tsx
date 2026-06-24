@@ -151,7 +151,7 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        <Link href="/workflows/builder" className="shrink-0 sm:w-auto w-full">
+        <Link href="/workflows/builder?new=1" className="shrink-0 sm:w-auto w-full">
           <Button className="w-full sm:w-auto">
             <Plus size={16} className="mr-1.5" />
             New workflow

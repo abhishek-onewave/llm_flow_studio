@@ -21,6 +21,7 @@ interface WorkspaceContextValue {
   workspace: Workspace | null;
   workspaceId: string | null;
   loading: boolean;
+  createWorkspace: (name: string) => Promise<boolean>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue>({
@@ -28,6 +29,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue>({
   workspace: null,
   workspaceId: null,
   loading: true,
+  createWorkspace: async () => false,
 });
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -80,6 +82,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  async function createWorkspace(name: string): Promise<boolean> {
+    if (!user) return false;
+    try {
+      const supabase = createClient();
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const { data: ws, error: wsErr } = await supabase
+        .from("workspaces")
+        .insert({ name, slug, created_by: user.id })
+        .select()
+        .single();
+      if (wsErr || !ws) return false;
+
+      await supabase.from("workspace_members").insert({
+        workspace_id: ws.id,
+        user_id: user.id,
+        role: "owner",
+      });
+
+      setWorkspace({ id: ws.id, name: ws.name, slug: ws.slug });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   return (
     <WorkspaceContext.Provider
       value={{
@@ -87,6 +114,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspace,
         workspaceId: workspace?.id ?? null,
         loading,
+        createWorkspace,
       }}
     >
       {children}

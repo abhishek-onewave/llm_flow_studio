@@ -18,6 +18,8 @@ export function BuilderToolbar() {
   const save = useWorkflowStore((s) => s.saveToLocalStorage);
   const reset = useWorkflowStore((s) => s.resetToSampleWorkflow);
   const runStatus = useWorkflowStore((s) => s.runStatus);
+  const workflowName = useWorkflowStore((s) => s.workflowName);
+  const setWorkflowName = useWorkflowStore((s) => s.setWorkflowName);
 
   const isRunning = runStatus === "running";
   const isPaused = runStatus === "queued"; // "queued" doubles as paused
@@ -27,7 +29,13 @@ export function BuilderToolbar() {
     <div className="flex h-11 shrink-0 items-center justify-between border-b border-hairline bg-surface-card px-4">
       {/* Left — workflow name & status */}
       <div className="flex min-w-0 items-center gap-3">
-        <h1 className="truncate text-sm font-bold text-ink">Contract Review Chain</h1>
+        <input
+          type="text"
+          value={workflowName}
+          onChange={(e) => setWorkflowName(e.target.value)}
+          className="truncate bg-transparent text-sm font-bold text-ink outline-none focus:underline focus:decoration-primary-cta"
+          aria-label="Workflow name"
+        />
         {isBusy ? (
           <span className="flex items-center gap-1 text-[11px] font-medium text-accent-blue">
             <Loader2 size={12} className="animate-spin" />

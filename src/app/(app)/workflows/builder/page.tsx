@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { PanelLeft, PanelRight } from "lucide-react";
 import {
   BuilderToolbar,
@@ -14,14 +15,33 @@ import { setWorkspaceId } from "@/lib/workflow/runner";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 
 export default function WorkflowBuilderPage() {
+  return (
+    <Suspense>
+      <BuilderInner />
+    </Suspense>
+  );
+}
+
+function BuilderInner() {
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
   const load = useWorkflowStore((s) => s.loadFromLocalStorage);
+  const resetNew = useWorkflowStore((s) => s.resetToNewWorkflow);
   const { workspaceId } = useWorkspace();
+  const searchParams = useSearchParams();
+  const didInit = useRef(false);
 
   const [showPalette, setShowPalette] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    if (searchParams.get("new") === "1") {
+      resetNew();
+    } else {
+      load();
+    }
+  }, [searchParams, resetNew, load]);
   useEffect(() => { if (workspaceId) setWorkspaceId(workspaceId); }, [workspaceId]);
 
   const closePalette = useCallback(() => setShowPalette(false), []);

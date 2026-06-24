@@ -77,6 +77,7 @@ const sampleEdges: Edge[] = [
 
 interface WorkflowState {
   /* Data */
+  workflowName: string;
   nodes: WorkflowNode[];
   edges: Edge[];
   selectedNodeId: string | null;
@@ -102,10 +103,14 @@ interface WorkflowState {
   /* Run events */
   appendRunEvent: (event: RunEvent) => void;
 
+  /* Workflow name */
+  setWorkflowName: (name: string) => void;
+
   /* Persistence */
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
   resetToSampleWorkflow: () => void;
+  resetToNewWorkflow: (name?: string) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -114,6 +119,7 @@ interface WorkflowState {
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   /* ── Initial state ──────────────────────────────────────────────── */
+  workflowName: "Contract Review Chain",
   nodes: sampleNodes,
   edges: sampleEdges,
   selectedNodeId: "n3",
@@ -193,6 +199,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   appendRunEvent: (event) =>
     set((s) => ({ runEvents: [...s.runEvents, event] })),
 
+  /* ── Workflow name ───────────────────────────────────────────────── */
+
+  setWorkflowName: (name) => set({ workflowName: name }),
+
   /* ── Persistence ────────────────────────────────────────────────── */
 
   saveToLocalStorage: () => {
@@ -242,9 +252,46 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       /* ignore */
     }
     set({
+      workflowName: "Contract Review Chain",
       nodes: sampleNodes,
       edges: sampleEdges,
       selectedNodeId: "n3",
+      runStatus: "idle",
+      runEvents: [],
+      nodeOutputs: {},
+    });
+  },
+
+  resetToNewWorkflow: (name) => {
+    const inputNode: WorkflowNode = {
+      id: "n-input",
+      type: "workflow",
+      position: { x: 300, y: 100 },
+      data: { label: "Input", subtitle: "Start", colorKey: "input", status: "idle" },
+    };
+    const outputNode: WorkflowNode = {
+      id: "n-output",
+      type: "workflow",
+      position: { x: 300, y: 300 },
+      data: { label: "Output", subtitle: "End", colorKey: "output", status: "idle" },
+    };
+    const edge: Edge = {
+      id: "e-input-output",
+      source: "n-input",
+      target: "n-output",
+      style: edgeStyle,
+      markerEnd: edgeMarker,
+    };
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    set({
+      workflowName: name ?? "Untitled Workflow",
+      nodes: [inputNode, outputNode],
+      edges: [edge],
+      selectedNodeId: null,
       runStatus: "idle",
       runEvents: [],
       nodeOutputs: {},

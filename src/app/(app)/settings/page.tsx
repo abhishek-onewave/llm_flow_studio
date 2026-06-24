@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import {
   Settings,
   Key,
@@ -12,7 +14,6 @@ import {
   FileText,
   ChevronDown,
   Plus,
-  RotateCw,
   ExternalLink,
   Info,
 } from "lucide-react";
@@ -75,20 +76,6 @@ const members: Member[] = [
   { name: "Sarah Kim", email: "sarah@acme.dev", role: "Viewer", lastActive: "3d ago", avatar: "SK" },
 ];
 
-interface Secret {
-  name: string;
-  provider: string;
-  maskedKey: string;
-  status: "active" | "expired" | "not_set";
-  lastRotated: string;
-}
-
-const secrets: Secret[] = [
-  { name: "OPENAI_API_KEY", provider: "OpenAI", maskedKey: "sk-proj-••••••••••mock", status: "active", lastRotated: "Jun 15, 2026" },
-  { name: "ANTHROPIC_API_KEY", provider: "Anthropic", maskedKey: "sk-ant-•••••••••mock", status: "active", lastRotated: "Jun 10, 2026" },
-  { name: "GITHUB_INSTALLATION", provider: "GitHub", maskedKey: "ghi-•••••••••••mock", status: "active", lastRotated: "May 28, 2026" },
-  { name: "VERCEL_TOKEN", provider: "Vercel", maskedKey: "", status: "not_set", lastRotated: "—" },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Shared UI helpers                                                  */
@@ -407,81 +394,133 @@ function UsageLimitsSection() {
 /* ------------------------------------------------------------------ */
 
 function SecretsSection() {
+  const { workspaceId } = useWorkspace();
+
+  interface ProviderSecret {
+    providerId: string;
+    providerName: string;
+    hasKey: boolean;
+  }
+
+  const [providers, setProviders] = useState<ProviderSecret[]>([]);
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+
+    async function load() {
+      const supabase = createClient();
+      const { data: wp } = await supabase
+        .from("workspace_providers")
+        .select("provider_id, encrypted_api_key, model_providers(name)")
+        .eq("workspace_id", workspaceId);
+
+      if (cancelled || !wp) return;
+
+      const list: ProviderSecret[] = (wp as unknown as Array<{
+        provider_id: string;
+        encrypted_api_key: string;
+        model_providers: { name: string } | null;
+      }>).map((row) => ({
+        providerId: row.provider_id,
+        providerName: (row.model_providers as { name: string } | null)?.name ?? row.provider_id,
+        hasKey: !!row.encrypted_api_key,
+      }));
+
+      setProviders(list);
+      setLoaded(true);
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  async function saveKey(providerId: string) {
+    if (!workspaceId) return;
+    const key = keyInputs[providerId]?.trim();
+    if (!key) return;
+
+    setSaving(providerId);
+    const supabase = createClient();
+    await supabase
+      .from("workspace_providers")
+      .update({ encrypted_api_key: key })
+      .eq("workspace_id", workspaceId)
+      .eq("provider_id", providerId);
+
+    setProviders((prev) =>
+      prev.map((p) => (p.providerId === providerId ? { ...p, hasKey: true } : p))
+    );
+    setKeyInputs((prev) => ({ ...prev, [providerId]: "" }));
+    setSaving(null);
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h2 className="text-base font-bold text-ink">Secrets</h2>
-        <p className="mt-0.5 text-xs text-mute">Manage API keys and tokens used by workflow integrations.</p>
+        <p className="mt-0.5 text-xs text-mute">Manage API keys for your connected providers. Go to Models to connect providers first.</p>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-hairline bg-surface-card">
-        <table className="w-full min-w-[700px] text-left" aria-label="Secrets">
-          <thead>
-            <tr className="border-b border-hairline-soft bg-surface-soft">
-              <th scope="col" className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-mute">Name</th>
-              <th scope="col" className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-mute">Provider</th>
-              <th scope="col" className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-mute">Value</th>
-              <th scope="col" className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-mute">Status</th>
-              <th scope="col" className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-mute">Last rotated</th>
-              <th scope="col" className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-mute"><span className="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {secrets.map((s) => (
-              <tr key={s.name} className="border-b border-hairline-soft last:border-0">
-                <td className="px-4 py-2.5 font-mono text-[11px] font-medium text-ink">{s.name}</td>
-                <td className="px-4 py-2.5 text-xs text-body">{s.provider}</td>
-                <td className="px-4 py-2.5 font-mono text-[10px] text-mute">
-                  {s.status === "not_set" ? <span className="italic">Not set</span> : s.maskedKey}
-                </td>
-                <td className="px-4 py-2.5">
+      {!loaded ? (
+        <p className="text-xs text-mute">Loading...</p>
+      ) : providers.length === 0 ? (
+        <div className="rounded-md border border-hairline bg-surface-card p-6 text-center">
+          <p className="text-xs text-mute">No providers connected. Go to the Models page to connect providers first.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {providers.map((p) => (
+            <div key={p.providerId} className="rounded-md border border-hairline bg-surface-card p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-ink">{p.providerName}</p>
                   <span
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                      s.status === "active" && "bg-accent-green-soft text-accent-green",
-                      s.status === "expired" && "bg-primary-cta/10 text-primary-cta",
-                      s.status === "not_set" && "bg-surface-soft text-mute",
+                      "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      p.hasKey ? "bg-accent-green-soft text-accent-green" : "bg-surface-soft text-mute",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 rounded-full",
-                        s.status === "active" && "bg-accent-green",
-                        s.status === "expired" && "bg-primary-cta",
-                        s.status === "not_set" && "bg-ash",
-                      )}
-                    />
-                    {s.status === "active" && "Active"}
-                    {s.status === "expired" && "Expired"}
-                    {s.status === "not_set" && "Not set"}
+                    <span className={cn("h-1.5 w-1.5 rounded-full", p.hasKey ? "bg-accent-green" : "bg-ash")} />
+                    {p.hasKey ? "Active" : "Not set"}
                   </span>
-                </td>
-                <td className="px-4 py-2.5 text-[11px] text-mute">{s.lastRotated}</td>
-                <td className="px-4 py-2.5 text-right">
-                  {s.status !== "not_set" ? (
-                    <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-body transition-colors hover:bg-surface-soft hover:text-ink">
-                      <RotateCw className="h-3 w-3" />
-                      Rotate
-                    </button>
-                  ) : (
-                    <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-body transition-colors hover:bg-surface-soft hover:text-ink">
-                      <Plus className="h-3 w-3" />
-                      Set
-                    </button>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type="password"
+                  value={keyInputs[p.providerId] ?? ""}
+                  onChange={(e) => setKeyInputs((prev) => ({ ...prev, [p.providerId]: e.target.value }))}
+                  placeholder={p.hasKey ? "Enter new key to update..." : "Paste API key..."}
+                  className="h-8 flex-1 rounded-md border border-hairline bg-surface-card px-3 font-mono text-xs text-ink placeholder:text-stone focus:border-accent-blue focus:outline-none"
+                />
+                <button
+                  onClick={() => saveKey(p.providerId)}
+                  disabled={saving === p.providerId || !keyInputs[p.providerId]?.trim()}
+                  className={cn(
+                    "h-8 rounded-md px-3 text-xs font-bold transition-colors",
+                    keyInputs[p.providerId]?.trim()
+                      ? "bg-primary-cta text-on-primary hover:bg-primary-pressed"
+                      : "cursor-not-allowed bg-surface-soft text-stone",
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                >
+                  {saving === p.providerId ? "Saving..." : p.hasKey ? "Update" : "Save"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Security note */}
       <div className="flex items-start gap-3 rounded-md bg-accent-blue-soft px-4 py-3">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent-blue" />
         <p className="text-xs leading-relaxed text-ink">
-          <span className="font-semibold">All secrets are encrypted at rest</span> using AES-256.
-          Secrets are never logged or exposed in workflow outputs. Rotate keys regularly.
+          <span className="font-semibold">API keys are stored in Supabase</span> and retrieved server-side
+          when running workflows. Keys are never exposed in browser output.
         </p>
       </div>
     </div>
