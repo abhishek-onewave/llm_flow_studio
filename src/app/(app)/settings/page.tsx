@@ -413,21 +413,26 @@ function SecretsSection() {
 
     async function load() {
       const supabase = createClient();
-      const { data: wp } = await supabase
-        .from("workspace_providers")
-        .select("provider_id, encrypted_api_key, model_providers(name)")
-        .eq("workspace_id", workspaceId);
 
-      if (cancelled || !wp) return;
+      // Fetch ALL providers + any workspace connection status
+      const [provRes, wpRes] = await Promise.all([
+        supabase.from("model_providers").select("id, name").order("name"),
+        supabase
+          .from("workspace_providers")
+          .select("provider_id, encrypted_api_key")
+          .eq("workspace_id", workspaceId),
+      ]);
 
-      const list: ProviderSecret[] = (wp as unknown as Array<{
-        provider_id: string;
-        encrypted_api_key: string;
-        model_providers: { name: string } | null;
-      }>).map((row) => ({
-        providerId: row.provider_id,
-        providerName: (row.model_providers as { name: string } | null)?.name ?? row.provider_id,
-        hasKey: !!row.encrypted_api_key,
+      if (cancelled) return;
+
+      const allProviders = (provRes.data ?? []) as Array<{ id: string; name: string }>;
+      const wpRows = (wpRes.data ?? []) as Array<{ provider_id: string; encrypted_api_key: string }>;
+      const keyMap = new Map(wpRows.map((r) => [r.provider_id, !!r.encrypted_api_key]));
+
+      const list: ProviderSecret[] = allProviders.map((p) => ({
+        providerId: p.id,
+        providerName: p.name,
+        hasKey: keyMap.get(p.id) ?? false,
       }));
 
       setProviders(list);
@@ -445,11 +450,17 @@ function SecretsSection() {
 
     setSaving(providerId);
     const supabase = createClient();
-    await supabase
-      .from("workspace_providers")
-      .update({ encrypted_api_key: key })
-      .eq("workspace_id", workspaceId)
-      .eq("provider_id", providerId);
+    // Upsert so it works whether or not the provider row already exists
+    await supabase.from("workspace_providers").upsert(
+      {
+        workspace_id: workspaceId,
+        provider_id: providerId,
+        is_enabled: true,
+        api_key_set: true,
+        encrypted_api_key: key,
+      },
+      { onConflict: "workspace_id,provider_id" },
+    );
 
     setProviders((prev) =>
       prev.map((p) => (p.providerId === providerId ? { ...p, hasKey: true } : p))
@@ -462,14 +473,14 @@ function SecretsSection() {
     <div className="space-y-5">
       <div>
         <h2 className="text-base font-bold text-ink">Secrets</h2>
-        <p className="mt-0.5 text-xs text-mute">Manage API keys for your connected providers. Go to Models to connect providers first.</p>
+        <p className="mt-0.5 text-xs text-mute">Manage API keys for all available LLM providers.</p>
       </div>
 
       {!loaded ? (
         <p className="text-xs text-mute">Loading...</p>
       ) : providers.length === 0 ? (
         <div className="rounded-md border border-hairline bg-surface-card p-6 text-center">
-          <p className="text-xs text-mute">No providers connected. Go to the Models page to connect providers first.</p>
+          <p className="text-xs text-mute">No providers found. Check your Supabase connection.</p>
         </div>
       ) : (
         <div className="space-y-3">
