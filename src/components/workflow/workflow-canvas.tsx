@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, type DragEvent } from "react";
 import {
   ReactFlow,
   Background,
@@ -32,8 +32,20 @@ function WorkflowCanvasInner() {
   const onConnect = useWorkflowStore((s) => s.onConnect);
   const selectNode = useWorkflowStore((s) => s.selectNode);
   const addNode = useWorkflowStore((s) => s.addNode);
+  const deleteNode = useWorkflowStore((s) => s.deleteNode);
+  const saveToLocalStorage = useWorkflowStore((s) => s.saveToLocalStorage);
 
   const reactFlowInstance = useReactFlow();
+
+  // Auto-save on every change (debounced)
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveToLocalStorage();
+    }, 500);
+    return () => clearTimeout(saveTimer.current);
+  }, [nodes, edges, saveToLocalStorage]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleSelectionChange: OnSelectionChangeFunc = useCallback(
@@ -94,11 +106,15 @@ function WorkflowCanvasInner() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={handleSelectionChange}
+        onNodesDelete={(deleted) => deleted.forEach((n) => deleteNode(n.id))}
+        deleteKeyCode={["Backspace", "Delete"]}
         fitView
         fitViewOptions={{ padding: 0.3 }}
         nodesDraggable
         nodesConnectable
         elementsSelectable
+        edgesFocusable
+        edgesReconnectable
         panOnDrag
         zoomOnScroll
         minZoom={0.3}

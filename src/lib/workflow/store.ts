@@ -206,8 +206,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   /* ── Persistence ────────────────────────────────────────────────── */
 
   saveToLocalStorage: () => {
-    const { nodes, edges } = get();
+    const { nodes, edges, workflowName } = get();
     const payload = {
+      workflowName,
       nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
       edges: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({
         id, source, target, sourceHandle, targetHandle,
@@ -225,11 +226,13 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as {
+        workflowName?: string;
         nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data: WorkflowNode["data"] }>;
         edges: Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
       };
       if (!parsed.nodes?.length) return;
       set({
+        workflowName: parsed.workflowName ?? "Untitled Workflow",
         nodes: parsed.nodes.map((n) => ({
           ...n,
           type: n.type ?? "workflow",
