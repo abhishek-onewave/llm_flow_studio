@@ -5,8 +5,16 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronUp, ChevronDown, Copy, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/lib/workflow/store";
+import { OutputRenderer, isMediaOutput } from "./output-renderer";
 
 const consoleTabs = ["Run Logs", "Console", "Environment"] as const;
+
+/** Reactively renders media output for a node in the console */
+function ConsoleMediaOutput({ nodeId }: { nodeId: string }) {
+  const output = useWorkflowStore((s) => s.nodeOutputs[nodeId]);
+  if (!output || !isMediaOutput(output)) return null;
+  return <OutputRenderer output={output} compact />;
+}
 
 export function RunConsole() {
   const [expanded, setExpanded] = useState(true);
@@ -99,17 +107,7 @@ export function RunConsole() {
                     >
                       {ev.message}
                     </span>
-                    {ev.type === "completed" && ev.message.includes("Image generated") && (() => {
-                      const outputs = useWorkflowStore.getState().nodeOutputs[ev.nodeId];
-                      if (outputs?.startsWith("[image:")) {
-                        const url = outputs.slice(7, -1);
-                        return (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={url} alt="Generated" className="mt-1 max-h-24 rounded" />
-                        );
-                      }
-                      return null;
-                    })()}
+                    {ev.type === "completed" && <ConsoleMediaOutput nodeId={ev.nodeId} />}
                   </div>
                 ))
               )}
