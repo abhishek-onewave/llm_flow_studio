@@ -207,12 +207,33 @@ function WorkflowNodeComponent({ id, data, selected }: NodeProps<WorkflowNode>) 
         </div>
       </div>
 
-      {/* Source handle — bottom */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-2 !w-2 !rounded-full !border !border-hairline !bg-surface-card"
-      />
+      {/* Source handle(s) — bottom */}
+      {data.colorKey === "condition" ? (
+        <>
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="true"
+            className="!h-2 !w-2 !rounded-full !border !border-hairline !bg-accent-green"
+            style={{ left: "33%" }}
+          />
+          <span className="absolute bottom-[-18px] text-[8px] font-bold text-accent-green" style={{ left: "28%" }}>True</span>
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="false"
+            className="!h-2 !w-2 !rounded-full !border !border-hairline !bg-accent-red"
+            style={{ left: "67%" }}
+          />
+          <span className="absolute bottom-[-18px] text-[8px] font-bold text-accent-red" style={{ left: "61%" }}>False</span>
+        </>
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!h-2 !w-2 !rounded-full !border !border-hairline !bg-surface-card"
+        />
+      )}
     </>
   );
 }

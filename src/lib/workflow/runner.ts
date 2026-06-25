@@ -27,6 +27,23 @@ function sleep(ms: number): Promise<void> {
 }
 
 let eventCounter = 0;
+/** Tracks condition node results for branch routing */
+const conditionResults = new Map<string, boolean>();
+
+/** Check if a node should be skipped due to condition branch routing */
+function shouldSkipForCondition(nodeId: string): boolean {
+  const { edges } = useWorkflowStore.getState();
+  const incomingEdges = edges.filter((e) => e.target === nodeId);
+  for (const edge of incomingEdges) {
+    if (conditionResults.has(edge.source)) {
+      const result = conditionResults.get(edge.source)!;
+      const handle = edge.sourceHandle;
+      if (handle === "true" && !result) return true;
+      if (handle === "false" && result) return true;
+    }
+  }
+  return false;
+}
 
 function emitEvent(
   nodeId: string,
@@ -280,10 +297,13 @@ async function executeConditionNode(
       break;
   }
 
+  // Store both the output and the branch result for downstream routing
   const output = result ? upstream : "[condition:false]";
   useWorkflowStore.setState((s) => ({
     nodeOutputs: { ...s.nodeOutputs, [node.id]: output },
   }));
+  // Track which branch is active for this condition node
+  conditionResults.set(node.id, result);
 
   setNodeStatus(node.id, "completed");
   emitEvent(
@@ -450,6 +470,7 @@ export async function runWorkflow(): Promise<void> {
   for (const id of order) setNodeStatus(id, "idle");
   for (const id of order) setNodeStatus(id, "queued");
 
+  conditionResults.clear();
   emitEvent("workflow", "Workflow", "started", "Workflow execution started.");
 
   for (const id of order) {
@@ -463,6 +484,13 @@ export async function runWorkflow(): Promise<void> {
 
     const node = useWorkflowStore.getState().nodes.find((n) => n.id === id);
     if (!node) continue;
+
+    // Skip nodes on inactive condition branches
+    if (shouldSkipForCondition(id)) {
+      setNodeStatus(id, "skipped");
+      emitEvent(id, node.data.label, "skipped", "Skipped — condition branch not taken.");
+      continue;
+    }
 
     const ok = await executeSingleNodeReal(node, abort.signal, activeWorkspaceId);
     if (!ok) break;
