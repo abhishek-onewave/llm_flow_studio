@@ -240,10 +240,18 @@ async function executeNonLLMNode(
     const inputFileContent = (config?.inputFileContent as string) || "";
     const inputFileName = (config?.inputFileName as string) || "";
 
-    if (inputMode === "file" && inputFileContent) {
-      output = inputFileContent.startsWith("data:")
-        ? `[file:${inputFileName}]\n${inputFileContent}`
-        : inputFileContent;
+    if (inputMode !== "text" && inputFileContent) {
+      // Tag output based on content type for downstream rendering
+      if (inputFileContent.startsWith("data:image/")) {
+        output = `[image:${inputFileContent}]`;
+      } else if (inputFileContent.startsWith("data:video/")) {
+        output = `[video:${inputFileContent}]`;
+      } else if (inputFileContent.startsWith("data:")) {
+        output = `[file:${inputFileName}]\n${inputFileContent}`;
+      } else {
+        // Text-based file content passed directly
+        output = inputFileContent;
+      }
     } else if (inputText) {
       output = inputText;
     } else {

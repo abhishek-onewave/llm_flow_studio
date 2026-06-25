@@ -17,6 +17,9 @@ import {
   Upload,
   FileText,
   Type,
+  ImageIcon,
+  Video,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/lib/workflow/store";
@@ -597,6 +600,42 @@ function ConfigurePanel({
 /*  Input node config                                                  */
 /* ------------------------------------------------------------------ */
 
+const inputModes = [
+  { value: "text", label: "Text", icon: <Type size={11} /> },
+  { value: "image", label: "Image", icon: <ImageIcon size={11} /> },
+  { value: "video", label: "Video", icon: <Video size={11} /> },
+  { value: "document", label: "Document", icon: <FileSpreadsheet size={11} /> },
+  { value: "file", label: "Any File", icon: <Upload size={11} /> },
+] as const;
+
+const fileAcceptByMode: Record<string, string> = {
+  image: "image/*",
+  video: "video/*",
+  document: ".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.csv,.tsv",
+  file: "*",
+};
+
+function fileTypeLabel(name: string, content: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) return "Image";
+  if (["mp4", "webm", "mov", "avi", "mkv"].includes(ext)) return "Video";
+  if (["pdf"].includes(ext)) return "PDF";
+  if (["ppt", "pptx"].includes(ext)) return "PowerPoint";
+  if (["doc", "docx"].includes(ext)) return "Word";
+  if (["xls", "xlsx"].includes(ext)) return "Excel";
+  if (["csv", "tsv"].includes(ext)) return "Spreadsheet";
+  if (content.startsWith("data:")) return "Binary file";
+  return "Text file";
+}
+
+function fileTypeIcon(name: string): React.ReactNode {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) return <ImageIcon size={14} className="shrink-0 text-accent-blue" />;
+  if (["mp4", "webm", "mov", "avi", "mkv"].includes(ext)) return <Video size={14} className="shrink-0 text-purple-500" />;
+  if (["ppt", "pptx", "xls", "xlsx", "csv", "tsv"].includes(ext)) return <FileSpreadsheet size={14} className="shrink-0 text-accent-green" />;
+  return <FileText size={14} className="shrink-0 text-accent-blue" />;
+}
+
 interface InputNodeConfigProps {
   inputMode: string;
   inputText: string;
@@ -607,6 +646,7 @@ interface InputNodeConfigProps {
 
 function InputNodeConfig({ inputMode, inputText, inputFileName, inputFileContent, onConfigChange }: InputNodeConfigProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeMode = inputMode || "text";
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -616,54 +656,49 @@ function InputNodeConfig({ inputMode, inputText, inputFileName, inputFileContent
     reader.onload = () => {
       const content = reader.result as string;
       onConfigChange({
-        inputMode: "file",
         inputFileName: file.name,
         inputFileContent: content,
       });
     };
-    // Read as text for text-based files, as data URL for binary
-    const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/csv"];
-    if (textTypes.some((t) => file.type.startsWith(t)) || file.name.match(/\.(txt|md|csv|tsv|json|xml|yaml|yml|html|css|js|ts|py|sh|sql)$/i)) {
+    // Read text-based files as text, everything else as data URL
+    const textExts = /\.(txt|md|csv|tsv|json|xml|yaml|yml|html|css|js|ts|py|sh|sql|log|env|toml|ini|cfg)$/i;
+    const textMimes = ["text/", "application/json", "application/xml", "application/javascript"];
+    if (textMimes.some((t) => file.type.startsWith(t)) || textExts.test(file.name)) {
       reader.readAsText(file);
     } else {
       reader.readAsDataURL(file);
     }
   };
 
+  const isFileMode = activeMode !== "text";
+  const accept = fileAcceptByMode[activeMode] ?? "*";
+
   return (
     <>
-      {/* Mode toggle */}
-      <Field label="Input Mode">
-        <div className="flex gap-1">
-          <button
-            onClick={() => onConfigChange({ inputMode: "text" })}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium transition-colors",
-              inputMode === "text" || !inputMode
-                ? "bg-ink text-on-dark"
-                : "bg-surface-soft text-body hover:text-ink"
-            )}
-          >
-            <Type size={12} />
-            Text
-          </button>
-          <button
-            onClick={() => onConfigChange({ inputMode: "file" })}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium transition-colors",
-              inputMode === "file"
-                ? "bg-ink text-on-dark"
-                : "bg-surface-soft text-body hover:text-ink"
-            )}
-          >
-            <Upload size={12} />
-            File Upload
-          </button>
+      {/* Mode selector */}
+      <Field label="Input Type">
+        <div className="grid grid-cols-5 gap-0.5 rounded-md bg-surface-soft p-0.5">
+          {inputModes.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => onConfigChange({ inputMode: m.value })}
+              title={m.label}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 rounded py-1.5 text-[9px] font-medium transition-colors",
+                activeMode === m.value
+                  ? "bg-ink text-on-dark"
+                  : "text-mute hover:text-ink"
+              )}
+            >
+              {m.icon}
+              {m.label}
+            </button>
+          ))}
         </div>
       </Field>
 
       {/* Text input */}
-      {(inputMode === "text" || !inputMode) && (
+      {activeMode === "text" && (
         <Field label="Input Text" htmlFor="inspector-input-text">
           <textarea
             id="inspector-input-text"
@@ -675,42 +710,72 @@ function InputNodeConfig({ inputMode, inputText, inputFileName, inputFileContent
         </Field>
       )}
 
-      {/* File upload */}
-      {inputMode === "file" && (
+      {/* File/media upload */}
+      {isFileMode && (
         <div className="flex flex-col gap-2">
           <input
             ref={fileInputRef}
             type="file"
+            accept={accept}
             onChange={handleFileUpload}
             className="hidden"
-            aria-label="Upload file"
+            aria-label={`Upload ${activeMode}`}
           />
+
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-hairline bg-surface-soft text-xs text-mute transition-colors hover:border-accent-blue hover:bg-canvas hover:text-body"
           >
-            <Upload size={16} />
-            <span>Click to upload a file</span>
+            {activeMode === "image" && <ImageIcon size={18} />}
+            {activeMode === "video" && <Video size={18} />}
+            {activeMode === "document" && <FileSpreadsheet size={18} />}
+            {activeMode === "file" && <Upload size={18} />}
+            <span>
+              {activeMode === "image" && "Upload an image (PNG, JPG, SVG...)"}
+              {activeMode === "video" && "Upload a video (MP4, WebM, MOV...)"}
+              {activeMode === "document" && "Upload a document (PDF, PPT, Word, Excel...)"}
+              {activeMode === "file" && "Upload any file"}
+            </span>
           </button>
 
+          {/* Uploaded file card */}
           {inputFileName && (
-            <div className="flex items-center gap-2 rounded-md border border-hairline-soft bg-surface-soft p-2">
-              <FileText size={14} className="shrink-0 text-accent-blue" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-ink">{inputFileName}</p>
-                <p className="text-[10px] text-mute">
-                  {inputFileContent.startsWith("data:")
-                    ? "Binary file (base64)"
-                    : `${inputFileContent.length.toLocaleString()} characters`}
-                </p>
+            <div className="flex flex-col gap-2 rounded-md border border-hairline-soft bg-surface-soft p-2">
+              <div className="flex items-center gap-2">
+                {fileTypeIcon(inputFileName)}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-ink">{inputFileName}</p>
+                  <p className="text-[10px] text-mute">
+                    {fileTypeLabel(inputFileName, inputFileContent)}
+                    {!inputFileContent.startsWith("data:") && ` · ${inputFileContent.length.toLocaleString()} chars`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onConfigChange({ inputFileName: "", inputFileContent: "" })}
+                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-mute hover:bg-accent-red-soft hover:text-accent-red"
+                  aria-label="Remove file"
+                >
+                  <X size={12} />
+                </button>
               </div>
-              <button
-                onClick={() => onConfigChange({ inputFileName: "", inputFileContent: "" })}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-mute hover:bg-accent-red-soft hover:text-accent-red"
-                aria-label="Remove file"
-              >
-                <X size={12} />
-              </button>
+
+              {/* Image preview */}
+              {inputFileContent.startsWith("data:image/") && (
+                <img
+                  src={inputFileContent}
+                  alt={inputFileName}
+                  className="max-h-32 w-full rounded object-contain"
+                />
+              )}
+
+              {/* Video preview */}
+              {inputFileContent.startsWith("data:video/") && (
+                <video
+                  src={inputFileContent}
+                  controls
+                  className="max-h-32 w-full rounded"
+                />
+              )}
             </div>
           )}
         </div>

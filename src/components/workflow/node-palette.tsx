@@ -57,6 +57,7 @@ const toolNodes: PaletteEntry[] = [
 ];
 
 const logicNodes: PaletteEntry[] = [
+  { nodeType: "input", label: "Input", subtitle: "Text / File / Media", icon: <FileText size={14} /> },
   { nodeType: "human_approval", label: "Human Approval", subtitle: "Approval gate", icon: <UserCheck size={14} /> },
   { nodeType: "condition", label: "Condition", subtitle: "Branch logic", icon: <GitBranch size={14} /> },
   { nodeType: "output", label: "Output", subtitle: "Final result", icon: <CircleDot size={14} /> },
