@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { OutputRenderer, isMediaOutput } from "./output-renderer";
 import {
   Play,
@@ -14,6 +14,9 @@ import {
   Coins,
   AlertTriangle,
   X,
+  Upload,
+  FileText,
+  Type,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/lib/workflow/store";
@@ -178,6 +181,10 @@ export function NodeInspector({ selectedNodeId, className, onClose }: NodeInspec
   const quality = (config.quality as string) ?? "standard";
   const conditionType = (config.conditionType as string) ?? "contains";
   const conditionValue = (config.conditionValue as string) ?? "";
+  const inputMode = (config.inputMode as string) ?? "text";
+  const inputText = (config.inputText as string) ?? "";
+  const inputFileName = (config.inputFileName as string) ?? "";
+  const inputFileContent = (config.inputFileContent as string) ?? "";
   const status = data?.status ?? "idle";
   const chip = statusStyles[status] ?? statusStyles.idle;
   const isLLM = !!provider;
@@ -286,6 +293,10 @@ export function NodeInspector({ selectedNodeId, className, onClose }: NodeInspec
             quality={quality}
             conditionType={conditionType}
             conditionValue={conditionValue}
+            inputMode={inputMode}
+            inputText={inputText}
+            inputFileName={inputFileName}
+            inputFileContent={inputFileContent}
             isLLM={isLLM}
             onLabelChange={updateLabel}
             onConfigChange={updateConfig}
@@ -330,6 +341,10 @@ interface ConfigurePanelProps {
   quality: string;
   conditionType: string;
   conditionValue: string;
+  inputMode: string;
+  inputText: string;
+  inputFileName: string;
+  inputFileContent: string;
   isLLM: boolean;
   onLabelChange: (v: string) => void;
   onConfigChange: (patch: Record<string, unknown>) => void;
@@ -349,6 +364,10 @@ function ConfigurePanel({
   quality,
   conditionType,
   conditionValue,
+  inputMode,
+  inputText,
+  inputFileName,
+  inputFileContent,
   isLLM,
   onLabelChange,
   onConfigChange,
@@ -560,7 +579,143 @@ function ConfigurePanel({
           </p>
         </div>
       )}
+
+      {colorKey === "input" && (
+        <InputNodeConfig
+          inputMode={inputMode}
+          inputText={inputText}
+          inputFileName={inputFileName}
+          inputFileContent={inputFileContent}
+          onConfigChange={onConfigChange}
+        />
+      )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Input node config                                                  */
+/* ------------------------------------------------------------------ */
+
+interface InputNodeConfigProps {
+  inputMode: string;
+  inputText: string;
+  inputFileName: string;
+  inputFileContent: string;
+  onConfigChange: (patch: Record<string, unknown>) => void;
+}
+
+function InputNodeConfig({ inputMode, inputText, inputFileName, inputFileContent, onConfigChange }: InputNodeConfigProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = reader.result as string;
+      onConfigChange({
+        inputMode: "file",
+        inputFileName: file.name,
+        inputFileContent: content,
+      });
+    };
+    // Read as text for text-based files, as data URL for binary
+    const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/csv"];
+    if (textTypes.some((t) => file.type.startsWith(t)) || file.name.match(/\.(txt|md|csv|tsv|json|xml|yaml|yml|html|css|js|ts|py|sh|sql)$/i)) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <>
+      {/* Mode toggle */}
+      <Field label="Input Mode">
+        <div className="flex gap-1">
+          <button
+            onClick={() => onConfigChange({ inputMode: "text" })}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium transition-colors",
+              inputMode === "text" || !inputMode
+                ? "bg-ink text-on-dark"
+                : "bg-surface-soft text-body hover:text-ink"
+            )}
+          >
+            <Type size={12} />
+            Text
+          </button>
+          <button
+            onClick={() => onConfigChange({ inputMode: "file" })}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium transition-colors",
+              inputMode === "file"
+                ? "bg-ink text-on-dark"
+                : "bg-surface-soft text-body hover:text-ink"
+            )}
+          >
+            <Upload size={12} />
+            File Upload
+          </button>
+        </div>
+      </Field>
+
+      {/* Text input */}
+      {(inputMode === "text" || !inputMode) && (
+        <Field label="Input Text" htmlFor="inspector-input-text">
+          <textarea
+            id="inspector-input-text"
+            value={inputText}
+            onChange={(e) => onConfigChange({ inputText: e.target.value })}
+            placeholder="Enter text input for the workflow..."
+            className="h-28 w-full resize-none rounded-md border border-hairline bg-surface-card px-3 py-2 text-xs text-ink placeholder:text-stone focus:border-accent-blue focus:outline-none"
+          />
+        </Field>
+      )}
+
+      {/* File upload */}
+      {inputMode === "file" && (
+        <div className="flex flex-col gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileUpload}
+            className="hidden"
+            aria-label="Upload file"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-hairline bg-surface-soft text-xs text-mute transition-colors hover:border-accent-blue hover:bg-canvas hover:text-body"
+          >
+            <Upload size={16} />
+            <span>Click to upload a file</span>
+          </button>
+
+          {inputFileName && (
+            <div className="flex items-center gap-2 rounded-md border border-hairline-soft bg-surface-soft p-2">
+              <FileText size={14} className="shrink-0 text-accent-blue" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-ink">{inputFileName}</p>
+                <p className="text-[10px] text-mute">
+                  {inputFileContent.startsWith("data:")
+                    ? "Binary file (base64)"
+                    : `${inputFileContent.length.toLocaleString()} characters`}
+                </p>
+              </div>
+              <button
+                onClick={() => onConfigChange({ inputFileName: "", inputFileContent: "" })}
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-mute hover:bg-accent-red-soft hover:text-accent-red"
+                aria-label="Remove file"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 

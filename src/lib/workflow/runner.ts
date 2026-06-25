@@ -231,9 +231,26 @@ async function executeNonLLMNode(
   await sleep(500);
   if (signal.aborted) return false;
 
-  // For input/output nodes, pass through upstream
+  // For input nodes, use configured text/file content
   let output: string;
-  if (colorKey === "output" || colorKey === "input") {
+  if (colorKey === "input") {
+    const config = (node.data as Record<string, unknown>).config as Record<string, unknown> | undefined;
+    const inputMode = (config?.inputMode as string) || "text";
+    const inputText = (config?.inputText as string) || "";
+    const inputFileContent = (config?.inputFileContent as string) || "";
+    const inputFileName = (config?.inputFileName as string) || "";
+
+    if (inputMode === "file" && inputFileContent) {
+      output = inputFileContent.startsWith("data:")
+        ? `[file:${inputFileName}]\n${inputFileContent}`
+        : inputFileContent;
+    } else if (inputText) {
+      output = inputText;
+    } else {
+      const upstream = getUpstreamOutputs(node.id);
+      output = upstream || "Input received.";
+    }
+  } else if (colorKey === "output") {
     const upstream = getUpstreamOutputs(node.id);
     output = upstream || (NON_LLM_OUTPUTS[colorKey] ?? NON_LLM_OUTPUTS._default);
   } else {
