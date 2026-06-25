@@ -26,7 +26,9 @@ import {
   Search,
   UserCheck,
   GitBranch,
+  Trash2,
 } from "lucide-react";
+import { useWorkflowStore } from "@/lib/workflow/store";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -125,7 +127,8 @@ const statusChips: Record<string, { bg: string; text: string; icon: React.ReactN
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode>) {
+function WorkflowNodeComponent({ id, data, selected }: NodeProps<WorkflowNode>) {
+  const deleteNode = useWorkflowStore((s) => s.deleteNode);
   const color = typeColors[data.colorKey] ?? "#bfc1b7";
   const icon = typeIcons[data.colorKey] ?? <Bot size={14} />;
   const chip = data.status ? statusChips[data.status] : null;
@@ -186,6 +189,13 @@ function WorkflowNodeComponent({ data, selected }: NodeProps<WorkflowNode>) {
             </button>
             <button aria-label="Stop node" className="inline-flex h-5 w-5 items-center justify-center rounded text-mute hover:bg-surface-soft hover:text-ink">
               <Square size={10} />
+            </button>
+            <button
+              aria-label="Delete node"
+              onClick={(e) => { e.stopPropagation(); deleteNode(id); }}
+              className="inline-flex h-5 w-5 items-center justify-center rounded text-mute hover:bg-accent-red-soft hover:text-accent-red"
+            >
+              <Trash2 size={10} />
             </button>
           </div>
         </div>

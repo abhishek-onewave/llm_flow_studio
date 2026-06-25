@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from "react";
 import {
   Upload,
   FileText,
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MascotPlaceholder } from "@/components/ui/mascot-placeholder";
-import { mockFiles, mockCollections, type FileStatus } from "@/lib/mock/files";
+import { mockFiles as initialMockFiles, mockCollections, type FileStatus, type FileRecord } from "@/lib/mock/files";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -64,10 +64,80 @@ function StatusChip({ status }: { status: FileStatus }) {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function FilesPage() {
-  const [selectedFileId, setSelectedFileId] = useState("f1");
+const ACCEPTED_TYPES = ".pdf,.docx,.txt,.md,.csv,.yaml,.yml,.json,.js,.ts,.tsx,.jsx,.py,.go,.rs,.java,.html,.css";
 
-  const selectedFile = mockFiles.find((f) => f.id === selectedFileId) ?? mockFiles[0];
+function getFileType(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    pdf: "PDF", docx: "DOCX", txt: "Text", md: "Markdown",
+    csv: "CSV", yaml: "YAML", yml: "YAML", json: "JSON",
+    js: "JS", ts: "TS", tsx: "TSX", jsx: "JSX",
+    py: "Python", go: "Go", rs: "Rust", java: "Java",
+    html: "HTML", css: "CSS",
+  };
+  return map[ext] ?? ext.toUpperCase();
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export default function FilesPage() {
+  const [files, setFiles] = useState<FileRecord[]>(initialMockFiles);
+  const [selectedFileId, setSelectedFileId] = useState("f1");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedFile = files.find((f) => f.id === selectedFileId) ?? files[0];
+
+  const addFiles = useCallback((fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const newFiles: FileRecord[] = Array.from(fileList).map((f, i) => ({
+      id: `upload-${Date.now()}-${i}`,
+      name: f.name,
+      type: getFileType(f.name),
+      size: formatSize(f.size),
+      status: "processing" as FileStatus,
+      usedIn: [],
+      uploaded: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    }));
+    setFiles((prev) => [...newFiles, ...prev]);
+    setSelectedFileId(newFiles[0].id);
+    // Simulate processing → indexed after 2s
+    setTimeout(() => {
+      setFiles((prev) =>
+        prev.map((f) =>
+          newFiles.some((n) => n.id === f.id) ? { ...f, status: "indexed" as FileStatus } : f,
+        ),
+      );
+    }, 2000);
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    addFiles(e.dataTransfer.files);
+  }, [addFiles]);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => setIsDragging(false), []);
+
+  const handleFileInput = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    addFiles(e.target.files);
+    // Reset so the same file can be re-selected
+    e.target.value = "";
+  }, [addFiles]);
+
+  const handleDeleteFile = useCallback((id: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setSelectedFileId((prev) => prev === id ? files[0]?.id ?? "" : prev);
+  }, [files]);
 
   return (
     <div className="p-6">
@@ -85,10 +155,22 @@ export default function FilesPage() {
             <FolderOpen className="h-3.5 w-3.5" />
             Create collection
           </button>
-          <button className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary-cta px-3 text-xs font-bold text-on-primary transition-colors hover:bg-primary-pressed sm:h-8 sm:flex-initial sm:justify-start">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary-cta px-3 text-xs font-bold text-on-primary transition-colors hover:bg-primary-pressed sm:h-8 sm:flex-initial sm:justify-start"
+          >
             <Upload className="h-3.5 w-3.5" />
             Upload files
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ACCEPTED_TYPES}
+            onChange={handleFileInput}
+            className="hidden"
+            aria-label="Upload files"
+          />
         </div>
       </div>
 
@@ -99,14 +181,28 @@ export default function FilesPage() {
           {/* Upload dropzone card */}
           <div className="rounded-md border border-hairline bg-surface-card p-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-mute">Upload</h2>
-            <div className="relative mt-3 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-hairline px-4 py-8 text-center">
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
+              className={cn(
+                "relative mt-3 flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors",
+                isDragging ? "border-primary-cta bg-primary-cta/5" : "border-hairline hover:border-mute",
+              )}
+            >
               {/* Mascot carrying folder */}
               <div className="absolute -top-4 right-3">
                 <MascotPlaceholder size="sm" mood="working" />
               </div>
 
-              <Upload className="h-6 w-6 text-mute" />
-              <p className="mt-2 text-xs font-medium text-ink">Drag files here or click to browse</p>
+              <Upload className={cn("h-6 w-6", isDragging ? "text-primary-cta" : "text-mute")} />
+              <p className="mt-2 text-xs font-medium text-ink">
+                {isDragging ? "Drop files to upload" : "Drag files here or click to browse"}
+              </p>
               <p className="mt-1 text-[10px] leading-relaxed text-mute">
                 PDF, DOCX, TXT, MD, CSV, YAML, JSON, code files up to 50 MB
               </p>
@@ -160,7 +256,7 @@ export default function FilesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockFiles.map((file) => (
+                  {files.map((file) => (
                     <tr
                       key={file.id}
                       onClick={() => setSelectedFileId(file.id)}
@@ -239,7 +335,10 @@ export default function FilesPage() {
                 <Eye className="h-3 w-3" />
                 Preview
               </button>
-              <button className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline px-3 text-[11px] font-semibold text-accent-red transition-colors hover:bg-accent-red-soft">
+              <button
+                onClick={() => handleDeleteFile(selectedFile.id)}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline px-3 text-[11px] font-semibold text-accent-red transition-colors hover:bg-accent-red-soft"
+              >
                 <Trash2 className="h-3 w-3" />
                 Delete
               </button>

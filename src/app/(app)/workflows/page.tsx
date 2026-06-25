@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useSyncExternalStore } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, Trash2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ interface SavedWorkflow {
 }
 
 function readSaved(): SavedWorkflow | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -33,13 +34,21 @@ function readSaved(): SavedWorkflow | null {
 }
 
 export default function WorkflowsPage() {
-  const [, forceRefresh] = useReducer((x: number) => x + 1, 0);
-  const saved = useSyncExternalStore(
-    () => () => {},
-    readSaved,
-    () => null,
-  );
+  const [saved, setSaved] = useState<SavedWorkflow | null>(() => readSaved());
   const resetNew = useWorkflowStore((s) => s.resetToNewWorkflow);
+
+  // Re-read from localStorage when the tab regains focus (user may have edited in builder tab)
+  useEffect(() => {
+    const onFocus = () => setSaved(readSaved());
+    window.addEventListener("focus", onFocus);
+    // Also listen for visibilitychange so navigating back refreshes the list
+    const onVisible = () => { if (document.visibilityState === "visible") setSaved(readSaved()); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   function handleDelete() {
     try {
@@ -48,7 +57,7 @@ export default function WorkflowsPage() {
       /* ignore */
     }
     resetNew();
-    forceRefresh();
+    setSaved(null);
   }
 
   return (
