@@ -70,9 +70,12 @@ const imageModelsByProvider: Record<string, { value: string; label: string }[]> 
   openai: [
     { value: "dall-e-3", label: "DALL-E 3" },
     { value: "dall-e-2", label: "DALL-E 2" },
+    { value: "gpt-image-1", label: "GPT Image 1" },
   ],
   google: [
-    { value: "gemini-2.0-flash-preview-image-generation", label: "Imagen (Gemini 2.0 Flash)" },
+    { value: "gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image" },
+    { value: "gemini-3-pro-image", label: "Gemini 3 Pro Image" },
+    { value: "gemini-3.1-flash-image", label: "Gemini 3.1 Flash Image" },
   ],
 };
 
@@ -104,7 +107,7 @@ const variableChips = [
   "{{file.text}}",
 ];
 
-const outputFormats = ["Text", "Markdown", "JSON", "Schema"] as const;
+const outputFormats = ["Text", "Markdown", "JSON", "Schema", "Image", "Video"] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Status helpers                                                     */

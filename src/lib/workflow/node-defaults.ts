@@ -51,7 +51,7 @@ const defaults: Record<string, Omit<WorkflowNodeData, "label" | "subtitle" | "co
   },
   google_image: {
     status: "idle",
-    config: { provider: "google", model: "gemini-2.0-flash-preview-image-generation", promptTemplate: "{{input}}", size: "1024x1024", quality: "standard", outputType: "image" },
+    config: { provider: "google", model: "gemini-2.5-flash-image", promptTemplate: "{{input}}", size: "1024x1024", quality: "standard", outputType: "image" },
   },
 
   /* Tool nodes */

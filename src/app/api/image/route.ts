@@ -102,7 +102,7 @@ async function handleGoogleImage(
         },
       ],
       generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"],
+        responseModalities: ["IMAGE"],
       },
     }),
   });

@@ -41,7 +41,7 @@ const llmNodes: PaletteEntry[] = [
 
 const imageNodes: PaletteEntry[] = [
   { nodeType: "openai_image", label: "OpenAI Image", subtitle: "DALL-E 3", icon: <ImageIcon size={14} /> },
-  { nodeType: "google_image", label: "Gemini Image", subtitle: "Imagen", icon: <ImageIcon size={14} /> },
+  { nodeType: "google_image", label: "Gemini Image", subtitle: "gemini-2.5-flash-image", icon: <ImageIcon size={14} /> },
 ];
 
 const toolNodes: PaletteEntry[] = [
