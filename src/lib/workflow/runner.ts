@@ -348,7 +348,11 @@ async function executeImageNode(
   const { setNodeStatus } = useWorkflowStore.getState();
   const config = (node.data as Record<string, unknown>).config as Record<string, unknown> | undefined;
   const provider = (config?.provider as string) || (node.data.colorKey === "google_image" ? "google" : "openai");
-  const model = (config?.model as string) || "dall-e-3";
+  let model = (config?.model as string) || (provider === "google" ? "gemini-2.5-flash-image" : "dall-e-3");
+  // Migrate deprecated model names
+  if (model === "gemini-2.0-flash-preview-image-generation") {
+    model = "gemini-2.5-flash-image";
+  }
   const size = (config?.size as string) || "1024x1024";
   const quality = (config?.quality as string) || "standard";
 
