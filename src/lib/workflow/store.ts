@@ -65,10 +65,10 @@ const sampleNodes: WorkflowNode[] = [
 ];
 
 const sampleEdges: Edge[] = [
-  { id: "e1-2", source: "n1", target: "n2", style: edgeStyle, markerEnd: edgeMarker },
-  { id: "e2-3", source: "n2", target: "n3", style: edgeStyle, markerEnd: edgeMarker },
-  { id: "e3-4", source: "n3", target: "n4", style: edgeStyle, markerEnd: edgeMarker },
-  { id: "e4-5", source: "n4", target: "n5", style: edgeStyle, markerEnd: edgeMarker },
+  { id: "e1-2", source: "n1", target: "n2", type: "deletable", style: edgeStyle, markerEnd: edgeMarker },
+  { id: "e2-3", source: "n2", target: "n3", type: "deletable", style: edgeStyle, markerEnd: edgeMarker },
+  { id: "e3-4", source: "n3", target: "n4", type: "deletable", style: edgeStyle, markerEnd: edgeMarker },
+  { id: "e4-5", source: "n4", target: "n5", type: "deletable", style: edgeStyle, markerEnd: edgeMarker },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -170,6 +170,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           target: connection.target!,
           sourceHandle: connection.sourceHandle ?? undefined,
           targetHandle: connection.targetHandle ?? undefined,
+          type: "deletable",
           style: edgeStyle,
           markerEnd: edgeMarker,
         },
@@ -239,6 +240,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         })) as WorkflowNode[],
         edges: parsed.edges.map((e) => ({
           ...e,
+          type: "deletable",
           style: edgeStyle,
           markerEnd: edgeMarker,
         })),
@@ -282,6 +284,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       id: "e-input-output",
       source: "n-input",
       target: "n-output",
+      type: "deletable",
       style: edgeStyle,
       markerEnd: edgeMarker,
     };

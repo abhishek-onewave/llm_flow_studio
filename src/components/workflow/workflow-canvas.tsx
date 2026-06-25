@@ -14,10 +14,12 @@ import "@xyflow/react/dist/style.css";
 
 import WorkflowNodeComponent from "./canvas-node";
 import type { WorkflowNode } from "./canvas-node";
+import DeletableEdgeComponent from "./deletable-edge";
 import { useWorkflowStore } from "@/lib/workflow/store";
 import { buildNodeData, type PaletteItem } from "@/lib/workflow/node-defaults";
 
 const nodeTypes = { workflow: WorkflowNodeComponent };
+const edgeTypes = { deletable: DeletableEdgeComponent };
 
 let nextId = 100;
 function generateId() {
@@ -101,6 +103,7 @@ function WorkflowCanvasInner() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -122,7 +125,7 @@ function WorkflowCanvasInner() {
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
-          type: "smoothstep",
+          type: "deletable",
           selectable: true,
           deletable: true,
           focusable: true,
