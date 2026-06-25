@@ -235,6 +235,108 @@ async function executeNonLLMNode(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Execute a condition node                                           */
+/* ------------------------------------------------------------------ */
+
+async function executeConditionNode(
+  node: WorkflowNode,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const { setNodeStatus } = useWorkflowStore.getState();
+  const config = (node.data as Record<string, unknown>).config as Record<string, unknown> | undefined;
+  const conditionType = (config?.conditionType as string) || "not_empty";
+  const conditionValue = (config?.conditionValue as string) || "";
+
+  setNodeStatus(node.id, "running");
+  emitEvent(node.id, node.data.label, "started", `Evaluating condition (${conditionType})...`);
+
+  await sleep(300);
+  if (signal.aborted) return false;
+
+  const upstream = getUpstreamOutputs(node.id);
+  let result = false;
+
+  switch (conditionType) {
+    case "contains":
+      result = upstream.includes(conditionValue);
+      break;
+    case "not_contains":
+      result = !upstream.includes(conditionValue);
+      break;
+    case "equals":
+      result = upstream.trim() === conditionValue.trim();
+      break;
+    case "not_empty":
+      result = upstream.trim().length > 0;
+      break;
+    case "regex":
+      try {
+        result = new RegExp(conditionValue).test(upstream);
+      } catch {
+        emitEvent(node.id, node.data.label, "error", `Invalid regex: ${conditionValue}`);
+        setNodeStatus(node.id, "error");
+        return false;
+      }
+      break;
+  }
+
+  const output = result ? upstream : "[condition:false]";
+  useWorkflowStore.setState((s) => ({
+    nodeOutputs: { ...s.nodeOutputs, [node.id]: output },
+  }));
+
+  setNodeStatus(node.id, "completed");
+  emitEvent(
+    node.id,
+    node.data.label,
+    "completed",
+    `Condition evaluated: ${result ? "TRUE — passing output through" : "FALSE — output blocked"}.`,
+  );
+
+  return true;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Execute a human approval node                                      */
+/* ------------------------------------------------------------------ */
+
+async function executeHumanApprovalNode(
+  node: WorkflowNode,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const { setNodeStatus, requestApproval } = useWorkflowStore.getState();
+
+  setNodeStatus(node.id, "running");
+  emitEvent(node.id, node.data.label, "started", "Waiting for human approval...");
+
+  // Request approval — UI will show approve/reject buttons
+  requestApproval(node.id, node.data.label);
+
+  // Poll until approval result is set or abort
+  while (true) {
+    if (signal.aborted) return false;
+
+    const { approvalResult } = useWorkflowStore.getState();
+    if (approvalResult === "approved") {
+      const upstream = getUpstreamOutputs(node.id);
+      useWorkflowStore.setState((s) => ({
+        nodeOutputs: { ...s.nodeOutputs, [node.id]: upstream || "Approved." },
+      }));
+      setNodeStatus(node.id, "completed");
+      emitEvent(node.id, node.data.label, "completed", "Approved — continuing workflow.");
+      return true;
+    }
+    if (approvalResult === "rejected") {
+      setNodeStatus(node.id, "error");
+      emitEvent(node.id, node.data.label, "error", "Rejected — workflow stopped.");
+      return false;
+    }
+
+    await sleep(200);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Execute an image generation node via /api/image                    */
 /* ------------------------------------------------------------------ */
 
@@ -306,6 +408,12 @@ async function executeSingleNodeReal(
   }
   if (LLM_TYPES.has(node.data.colorKey)) {
     return executeLLMNode(node, signal, workspaceId);
+  }
+  if (node.data.colorKey === "condition") {
+    return executeConditionNode(node, signal);
+  }
+  if (node.data.colorKey === "human_approval") {
+    return executeHumanApprovalNode(node, signal);
   }
   return executeNonLLMNode(node, signal);
 }

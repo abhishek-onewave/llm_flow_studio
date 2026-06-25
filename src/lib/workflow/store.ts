@@ -207,6 +207,13 @@ interface WorkflowState {
   /* Run events */
   appendRunEvent: (event: RunEvent) => void;
 
+  /* Human approval */
+  pendingApproval: { nodeId: string; nodeLabel: string } | null;
+  approvalResult: "approved" | "rejected" | null;
+  requestApproval: (nodeId: string, nodeLabel: string) => void;
+  approveNode: () => void;
+  rejectNode: () => void;
+
   /* Workflow name */
   setWorkflowName: (name: string) => void;
 
@@ -238,6 +245,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   runStatus: "idle",
   runEvents: [],
   nodeOutputs: {},
+  pendingApproval: null,
+  approvalResult: null,
 
   /* ── Node CRUD ──────────────────────────────────────────────────── */
 
@@ -311,6 +320,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   appendRunEvent: (event) =>
     set((s) => ({ runEvents: [...s.runEvents, event] })),
+
+  /* ── Human approval ────────────────────────────────────────────── */
+
+  requestApproval: (nodeId, nodeLabel) =>
+    set({ pendingApproval: { nodeId, nodeLabel }, approvalResult: null }),
+
+  approveNode: () =>
+    set({ pendingApproval: null, approvalResult: "approved" }),
+
+  rejectNode: () =>
+    set({ pendingApproval: null, approvalResult: "rejected" }),
 
   /* ── Workflow name ───────────────────────────────────────────────── */
 

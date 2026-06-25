@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type DragEvent, type ChangeEvent } from "react";
 import {
   Upload,
   FileText,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MascotPlaceholder } from "@/components/ui/mascot-placeholder";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { mockFiles as initialMockFiles, mockCollections, type FileStatus, type FileRecord } from "@/lib/mock/files";
 
 /* ------------------------------------------------------------------ */
@@ -84,16 +85,91 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Convert a Supabase file row to local FileRecord */
+function toFileRecord(row: {
+  id: string;
+  filename: string;
+  size_bytes: number;
+  mime_type: string;
+  created_at: string;
+}): FileRecord {
+  return {
+    id: row.id,
+    name: row.filename,
+    type: getFileType(row.filename),
+    size: formatSize(row.size_bytes),
+    status: "indexed" as FileStatus,
+    usedIn: [],
+    uploaded: new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+  };
+}
+
 export default function FilesPage() {
+  const { workspaceId } = useWorkspace();
   const [files, setFiles] = useState<FileRecord[]>(initialMockFiles);
   const [selectedFileId, setSelectedFileId] = useState("f1");
   const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedFile = files.find((f) => f.id === selectedFileId) ?? files[0];
 
-  const addFiles = useCallback((fileList: FileList | null) => {
+  // Load files from Supabase on mount if workspace is available
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    async function loadFiles() {
+      try {
+        const res = await fetch(`/api/files?workspaceId=${workspaceId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const dbFiles = ((data as { files: Array<{ id: string; filename: string; size_bytes: number; mime_type: string; created_at: string }> }).files ?? []).map(toFileRecord);
+        if (dbFiles.length > 0) {
+          setFiles(dbFiles);
+          setSelectedFileId(dbFiles[0].id);
+        }
+      } catch {
+        // Fall back to mock data
+      }
+    }
+
+    loadFiles();
+  }, [workspaceId]);
+
+  const addFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
+
+    // If we have a workspace, upload to Supabase
+    if (workspaceId) {
+      setUploading(true);
+      const uploaded: FileRecord[] = [];
+
+      for (const file of Array.from(fileList)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("workspaceId", workspaceId);
+
+        try {
+          const res = await fetch("/api/files", { method: "POST", body: formData });
+          if (res.ok) {
+            const data = await res.json();
+            const row = (data as { file: { id: string; filename: string; size_bytes: number; mime_type: string; created_at: string } }).file;
+            uploaded.push(toFileRecord(row));
+          }
+        } catch {
+          // Skip failed upload
+        }
+      }
+
+      if (uploaded.length > 0) {
+        setFiles((prev) => [...uploaded, ...prev]);
+        setSelectedFileId(uploaded[0].id);
+      }
+      setUploading(false);
+      return;
+    }
+
+    // Fallback: local-only
     const newFiles: FileRecord[] = Array.from(fileList).map((f, i) => ({
       id: `upload-${Date.now()}-${i}`,
       name: f.name,
@@ -113,7 +189,7 @@ export default function FilesPage() {
         ),
       );
     }, 2000);
-  }, []);
+  }, [workspaceId]);
 
   const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -134,10 +210,19 @@ export default function FilesPage() {
     e.target.value = "";
   }, [addFiles]);
 
-  const handleDeleteFile = useCallback((id: string) => {
+  const handleDeleteFile = useCallback(async (id: string) => {
+    // If workspace, delete from Supabase
+    if (workspaceId) {
+      try {
+        await fetch(`/api/files?id=${id}&workspaceId=${workspaceId}`, { method: "DELETE" });
+      } catch {
+        // Continue with local removal
+      }
+    }
+
     setFiles((prev) => prev.filter((f) => f.id !== id));
     setSelectedFileId((prev) => prev === id ? files[0]?.id ?? "" : prev);
-  }, [files]);
+  }, [files, workspaceId]);
 
   return (
     <div className="p-6">
@@ -157,10 +242,15 @@ export default function FilesPage() {
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary-cta px-3 text-xs font-bold text-on-primary transition-colors hover:bg-primary-pressed sm:h-8 sm:flex-initial sm:justify-start"
+            disabled={uploading}
+            className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary-cta px-3 text-xs font-bold text-on-primary transition-colors hover:bg-primary-pressed disabled:opacity-50 sm:h-8 sm:flex-initial sm:justify-start"
           >
-            <Upload className="h-3.5 w-3.5" />
-            Upload files
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+            {uploading ? "Uploading..." : "Upload files"}
           </button>
           <input
             ref={fileInputRef}
@@ -297,53 +387,55 @@ export default function FilesPage() {
           </div>
 
           {/* File processing preview card */}
-          <div className="rounded-md border border-hairline bg-surface-card p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-mute">File preview</h2>
-              <span className="rounded bg-surface-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase text-mute">{selectedFile.type}</span>
-            </div>
+          {selectedFile && (
+            <div className="rounded-md border border-hairline bg-surface-card p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-mute">File preview</h2>
+                <span className="rounded bg-surface-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase text-mute">{selectedFile.type}</span>
+              </div>
 
-            <h3 className="mt-3 text-sm font-semibold text-ink">{selectedFile.name}</h3>
+              <h3 className="mt-3 text-sm font-semibold text-ink">{selectedFile.name}</h3>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Size</p>
-                <p className="text-xs font-semibold text-ink">{selectedFile.size}</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-surface-soft px-3 py-2">
+                  <p className="text-[10px] text-mute">Size</p>
+                  <p className="text-xs font-semibold text-ink">{selectedFile.size}</p>
+                </div>
+                <div className="rounded-md bg-surface-soft px-3 py-2">
+                  <p className="text-[10px] text-mute">Status</p>
+                  <p className="text-xs font-semibold text-ink"><StatusChip status={selectedFile.status} /></p>
+                </div>
+                <div className="rounded-md bg-surface-soft px-3 py-2">
+                  <p className="text-[10px] text-mute">Used in</p>
+                  <p className="text-xs font-semibold text-ink">
+                    {selectedFile.usedIn.length > 0 ? selectedFile.usedIn.join(", ") : "None"}
+                  </p>
+                </div>
+                <div className="rounded-md bg-surface-soft px-3 py-2">
+                  <p className="text-[10px] text-mute">Uploaded</p>
+                  <p className="text-xs font-semibold text-ink">{selectedFile.uploaded}</p>
+                </div>
               </div>
-              <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Status</p>
-                <p className="text-xs font-semibold text-ink"><StatusChip status={selectedFile.status} /></p>
-              </div>
-              <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Used in</p>
-                <p className="text-xs font-semibold text-ink">
-                  {selectedFile.usedIn.length > 0 ? selectedFile.usedIn.join(", ") : "None"}
-                </p>
-              </div>
-              <div className="rounded-md bg-surface-soft px-3 py-2">
-                <p className="text-[10px] text-mute">Uploaded</p>
-                <p className="text-xs font-semibold text-ink">{selectedFile.uploaded}</p>
+
+              <div className="mt-4 flex items-center gap-2">
+                <button className="inline-flex h-7 items-center gap-1 rounded-md bg-primary-cta px-3 text-[11px] font-semibold text-on-primary transition-colors hover:bg-primary-pressed">
+                  <ExternalLink className="h-3 w-3" />
+                  Use in workflow
+                </button>
+                <button className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline px-3 text-[11px] font-semibold text-body transition-colors hover:bg-surface-soft">
+                  <Eye className="h-3 w-3" />
+                  Preview
+                </button>
+                <button
+                  onClick={() => handleDeleteFile(selectedFile.id)}
+                  className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline px-3 text-[11px] font-semibold text-accent-red transition-colors hover:bg-accent-red-soft"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </button>
               </div>
             </div>
-
-            <div className="mt-4 flex items-center gap-2">
-              <button className="inline-flex h-7 items-center gap-1 rounded-md bg-primary-cta px-3 text-[11px] font-semibold text-on-primary transition-colors hover:bg-primary-pressed">
-                <ExternalLink className="h-3 w-3" />
-                Use in workflow
-              </button>
-              <button className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline px-3 text-[11px] font-semibold text-body transition-colors hover:bg-surface-soft">
-                <Eye className="h-3 w-3" />
-                Preview
-              </button>
-              <button
-                onClick={() => handleDeleteFile(selectedFile.id)}
-                className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline px-3 text-[11px] font-semibold text-accent-red transition-colors hover:bg-accent-red-soft"
-              >
-                <Trash2 className="h-3 w-3" />
-                Delete
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* Safety callout */}
           <div className="flex items-start gap-3 rounded-md bg-accent-blue-soft px-4 py-3">

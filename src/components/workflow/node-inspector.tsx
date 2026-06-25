@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { OutputRenderer } from "./output-renderer";
+import { OutputRenderer, isMediaOutput } from "./output-renderer";
 import {
   Play,
   Pause,
@@ -32,12 +32,18 @@ const providerOptions = [
   { value: "custom", label: "Custom" },
 ];
 
+const imageProviderOptions = [
+  { value: "openai", label: "OpenAI (DALL-E)" },
+  { value: "google", label: "Google (Imagen)" },
+];
+
 const modelsByProvider: Record<string, { value: string; label: string }[]> = {
   openai: [
     { value: "gpt-4o", label: "GPT-4o" },
     { value: "gpt-4o-mini", label: "GPT-4o Mini" },
     { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
     { value: "o3", label: "o3" },
+    { value: "o4-mini", label: "o4-mini" },
   ],
   anthropic: [
     { value: "claude-sonnet-4", label: "Claude Sonnet 4" },
@@ -59,6 +65,37 @@ const modelsByProvider: Record<string, { value: string; label: string }[]> = {
     { value: "custom-model", label: "Custom endpoint" },
   ],
 };
+
+const imageModelsByProvider: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: "dall-e-3", label: "DALL-E 3" },
+    { value: "dall-e-2", label: "DALL-E 2" },
+  ],
+  google: [
+    { value: "gemini-2.0-flash-preview-image-generation", label: "Imagen (Gemini 2.0 Flash)" },
+  ],
+};
+
+const imageSizeOptions = [
+  { value: "1024x1024", label: "1024×1024 (Square)" },
+  { value: "1792x1024", label: "1792×1024 (Landscape)" },
+  { value: "1024x1792", label: "1024×1792 (Portrait)" },
+];
+
+const imageQualityOptions = [
+  { value: "standard", label: "Standard" },
+  { value: "hd", label: "HD" },
+];
+
+const IMAGE_GEN_TYPES = new Set(["openai_image", "google_image"]);
+
+const conditionTypes = [
+  { value: "contains", label: "Contains" },
+  { value: "not_contains", label: "Does not contain" },
+  { value: "equals", label: "Equals" },
+  { value: "not_empty", label: "Is not empty" },
+  { value: "regex", label: "Matches regex" },
+];
 
 const variableChips = [
   "{{workflow.input}}",
@@ -134,6 +171,10 @@ export function NodeInspector({ selectedNodeId, className, onClose }: NodeInspec
   const timeout = (config.timeout as number) ?? 30;
   const retryCount = (config.retryCount as number) ?? 2;
   const outputFormat = (config.outputFormat as string) ?? "text";
+  const size = (config.size as string) ?? "1024x1024";
+  const quality = (config.quality as string) ?? "standard";
+  const conditionType = (config.conditionType as string) ?? "contains";
+  const conditionValue = (config.conditionValue as string) ?? "";
   const status = data?.status ?? "idle";
   const chip = statusStyles[status] ?? statusStyles.idle;
   const isLLM = !!provider;
@@ -238,6 +279,10 @@ export function NodeInspector({ selectedNodeId, className, onClose }: NodeInspec
             maxTokens={maxTokens}
             timeout={timeout}
             retryCount={retryCount}
+            size={size}
+            quality={quality}
+            conditionType={conditionType}
+            conditionValue={conditionValue}
             isLLM={isLLM}
             onLabelChange={updateLabel}
             onConfigChange={updateConfig}
@@ -278,6 +323,10 @@ interface ConfigurePanelProps {
   maxTokens: number;
   timeout: number;
   retryCount: number;
+  size: string;
+  quality: string;
+  conditionType: string;
+  conditionValue: string;
   isLLM: boolean;
   onLabelChange: (v: string) => void;
   onConfigChange: (patch: Record<string, unknown>) => void;
@@ -293,12 +342,20 @@ function ConfigurePanel({
   maxTokens,
   timeout,
   retryCount,
+  size,
+  quality,
+  conditionType,
+  conditionValue,
   isLLM,
   onLabelChange,
   onConfigChange,
 }: ConfigurePanelProps) {
   const chip = statusStyles[status] ?? statusStyles.idle;
-  const models = modelsByProvider[provider] ?? [];
+  const isImageGen = IMAGE_GEN_TYPES.has(colorKey);
+  const models = isImageGen
+    ? (imageModelsByProvider[provider] ?? [])
+    : (modelsByProvider[provider] ?? []);
+  const providers = isImageGen ? imageProviderOptions : providerOptions;
 
   return (
     <div className="flex flex-col gap-3">
@@ -327,7 +384,7 @@ function ConfigurePanel({
         </span>
       </Field>
 
-      {isLLM && (
+      {(isLLM || isImageGen) && (
         <>
           {/* Provider */}
           <Field label="Provider" htmlFor="inspector-provider">
@@ -336,12 +393,13 @@ function ConfigurePanel({
               value={provider}
               onChange={(e) => {
                 const newProvider = e.target.value;
-                const firstModel = modelsByProvider[newProvider]?.[0]?.value ?? "";
+                const lookup = isImageGen ? imageModelsByProvider : modelsByProvider;
+                const firstModel = lookup[newProvider]?.[0]?.value ?? "";
                 onConfigChange({ provider: newProvider, model: firstModel });
               }}
               className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-2 text-xs text-ink focus:border-accent-blue focus:outline-none"
             >
-              {providerOptions.map((p) => (
+              {providers.map((p) => (
                 <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>
@@ -361,64 +419,143 @@ function ConfigurePanel({
             </select>
           </Field>
 
-          {/* Temperature */}
-          <Field label="Temperature" htmlFor="inspector-temperature">
-            <div className="flex items-center gap-2">
-              <input
-                id="inspector-temperature"
-                type="range"
-                min={0}
-                max={2}
-                step={0.1}
-                value={temperature}
-                onChange={(e) => onConfigChange({ temperature: parseFloat(e.target.value) })}
-                aria-label="Temperature"
-                aria-valuemin={0}
-                aria-valuemax={2}
-                aria-valuenow={temperature}
-                className="h-1.5 flex-1 appearance-none rounded-full bg-surface-soft accent-primary-cta"
-              />
-              <span className="w-8 text-right text-[11px] font-medium text-ink">
-                {temperature.toFixed(1)}
-              </span>
-            </div>
-          </Field>
+          {isImageGen ? (
+            <>
+              {/* Image Size */}
+              <Field label="Image Size" htmlFor="inspector-image-size">
+                <select
+                  id="inspector-image-size"
+                  value={size}
+                  onChange={(e) => onConfigChange({ size: e.target.value })}
+                  className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-2 text-xs text-ink focus:border-accent-blue focus:outline-none"
+                >
+                  {imageSizeOptions.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </Field>
 
-          {/* Max tokens */}
-          <Field label="Max Output Tokens" htmlFor="inspector-max-tokens">
-            <input
-              id="inspector-max-tokens"
-              type="number"
-              value={maxTokens}
-              onChange={(e) => onConfigChange({ maxTokens: parseInt(e.target.value) || 4096 })}
-              className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink focus:border-accent-blue focus:outline-none"
-            />
-          </Field>
+              {/* Image Quality */}
+              <Field label="Quality" htmlFor="inspector-image-quality">
+                <select
+                  id="inspector-image-quality"
+                  value={quality}
+                  onChange={(e) => onConfigChange({ quality: e.target.value })}
+                  className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-2 text-xs text-ink focus:border-accent-blue focus:outline-none"
+                >
+                  {imageQualityOptions.map((q) => (
+                    <option key={q.value} value={q.value}>{q.label}</option>
+                  ))}
+                </select>
+              </Field>
+            </>
+          ) : (
+            <>
+              {/* Temperature */}
+              <Field label="Temperature" htmlFor="inspector-temperature">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="inspector-temperature"
+                    type="range"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={temperature}
+                    onChange={(e) => onConfigChange({ temperature: parseFloat(e.target.value) })}
+                    aria-label="Temperature"
+                    aria-valuemin={0}
+                    aria-valuemax={2}
+                    aria-valuenow={temperature}
+                    className="h-1.5 flex-1 appearance-none rounded-full bg-surface-soft accent-primary-cta"
+                  />
+                  <span className="w-8 text-right text-[11px] font-medium text-ink">
+                    {temperature.toFixed(1)}
+                  </span>
+                </div>
+              </Field>
 
-          {/* Timeout */}
-          <Field label="Timeout (seconds)" htmlFor="inspector-timeout">
-            <input
-              id="inspector-timeout"
-              type="number"
-              value={timeout}
-              onChange={(e) => onConfigChange({ timeout: parseInt(e.target.value) || 30 })}
-              className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink focus:border-accent-blue focus:outline-none"
-            />
-          </Field>
+              {/* Max tokens */}
+              <Field label="Max Output Tokens" htmlFor="inspector-max-tokens">
+                <input
+                  id="inspector-max-tokens"
+                  type="number"
+                  value={maxTokens}
+                  onChange={(e) => onConfigChange({ maxTokens: parseInt(e.target.value) || 4096 })}
+                  className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink focus:border-accent-blue focus:outline-none"
+                />
+              </Field>
 
-          {/* Retry count */}
-          <Field label="Retry Count" htmlFor="inspector-retry-count">
-            <input
-              id="inspector-retry-count"
-              type="number"
-              min={0}
-              max={5}
-              value={retryCount}
-              onChange={(e) => onConfigChange({ retryCount: parseInt(e.target.value) || 0 })}
-              className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink focus:border-accent-blue focus:outline-none"
-            />
-          </Field>
+              {/* Timeout */}
+              <Field label="Timeout (seconds)" htmlFor="inspector-timeout">
+                <input
+                  id="inspector-timeout"
+                  type="number"
+                  value={timeout}
+                  onChange={(e) => onConfigChange({ timeout: parseInt(e.target.value) || 30 })}
+                  className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink focus:border-accent-blue focus:outline-none"
+                />
+              </Field>
+
+              {/* Retry count */}
+              <Field label="Retry Count" htmlFor="inspector-retry-count">
+                <input
+                  id="inspector-retry-count"
+                  type="number"
+                  min={0}
+                  max={5}
+                  value={retryCount}
+                  onChange={(e) => onConfigChange({ retryCount: parseInt(e.target.value) || 0 })}
+                  className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink focus:border-accent-blue focus:outline-none"
+                />
+              </Field>
+            </>
+          )}
         </>
+      )}
+
+      {colorKey === "condition" && (
+        <>
+          {/* Condition Type */}
+          <Field label="Condition Type" htmlFor="inspector-condition-type">
+            <select
+              id="inspector-condition-type"
+              value={conditionType}
+              onChange={(e) => onConfigChange({ conditionType: e.target.value })}
+              className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-2 text-xs text-ink focus:border-accent-blue focus:outline-none"
+            >
+              {conditionTypes.map((ct) => (
+                <option key={ct.value} value={ct.value}>{ct.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Condition Value */}
+          {conditionType !== "not_empty" && (
+            <Field label="Condition Value" htmlFor="inspector-condition-value">
+              <input
+                id="inspector-condition-value"
+                type="text"
+                value={conditionValue}
+                onChange={(e) => onConfigChange({ conditionValue: e.target.value })}
+                placeholder={conditionType === "regex" ? "e.g. \\d+" : "e.g. success"}
+                className="flex h-8 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-xs text-ink placeholder:text-stone focus:border-accent-blue focus:outline-none"
+              />
+            </Field>
+          )}
+
+          <p className="text-[10px] text-mute">
+            Evaluates upstream output against this condition. If true, passes output through. If false, outputs &quot;[condition:false]&quot;.
+          </p>
+        </>
+      )}
+
+      {colorKey === "human_approval" && (
+        <div className="rounded-md border border-hairline-soft bg-surface-soft p-3">
+          <p className="text-[11px] font-medium text-ink">Approval Gate</p>
+          <p className="mt-1 text-[10px] text-mute">
+            This node pauses workflow execution and waits for manual approval. You&apos;ll see an approve/reject prompt in the run console when this node is reached.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -592,7 +729,10 @@ function OutputPanel({ outputFormat, onConfigChange, nodeId }: OutputPanelProps)
             </span>
           )}
         </div>
-        <div className="rounded-md bg-surface-dark px-4 py-3 max-h-64 overflow-y-auto">
+        <div className={cn(
+          "rounded-md px-4 py-3 max-h-64 overflow-y-auto",
+          isMediaOutput(liveOutput) ? "bg-surface-soft border border-hairline-soft" : "bg-surface-dark"
+        )}>
           <OutputRenderer output={liveOutput} />
         </div>
       </div>

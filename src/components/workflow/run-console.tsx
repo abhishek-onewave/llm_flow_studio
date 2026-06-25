@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 // useEffect and useRef kept for scroll
-import { ChevronUp, ChevronDown, Copy, Trash2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Copy, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/lib/workflow/store";
 import { OutputRenderer, isMediaOutput } from "./output-renderer";
@@ -14,6 +14,44 @@ function ConsoleMediaOutput({ nodeId }: { nodeId: string }) {
   const output = useWorkflowStore((s) => s.nodeOutputs[nodeId]);
   if (!output || !isMediaOutput(output)) return null;
   return <OutputRenderer output={output} compact />;
+}
+
+/** Approval banner shown when a human approval node is waiting */
+function ApprovalBanner() {
+  const pendingApproval = useWorkflowStore((s) => s.pendingApproval);
+  const approveNode = useWorkflowStore((s) => s.approveNode);
+  const rejectNode = useWorkflowStore((s) => s.rejectNode);
+
+  if (!pendingApproval) return null;
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-hairline-soft bg-accent-blue-soft px-4 py-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue text-white">
+          <CheckCircle2 size={12} />
+        </span>
+        <span className="truncate text-[11px] font-medium text-ink">
+          &ldquo;{pendingApproval.nodeLabel}&rdquo; is waiting for approval
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={approveNode}
+          className="inline-flex h-7 items-center gap-1 rounded-md bg-accent-green px-3 text-[11px] font-bold text-white transition-colors hover:bg-accent-green/90"
+        >
+          <CheckCircle2 size={12} />
+          Approve
+        </button>
+        <button
+          onClick={rejectNode}
+          className="inline-flex h-7 items-center gap-1 rounded-md bg-accent-red px-3 text-[11px] font-bold text-white transition-colors hover:bg-accent-red/90"
+        >
+          <XCircle size={12} />
+          Reject
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function RunConsole() {
@@ -82,6 +120,9 @@ export function RunConsole() {
           </button>
         </div>
       </div>
+
+      {/* Approval banner */}
+      {expanded && <ApprovalBanner />}
 
       {/* Log content */}
       {expanded && (

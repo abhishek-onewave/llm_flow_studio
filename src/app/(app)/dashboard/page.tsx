@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { MascotPlaceholder } from "@/components/ui/mascot-placeholder";
 import { Button } from "@/components/ui/button";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { mockWorkflowSummaries } from "@/lib/mock/workflows";
 import { mockRunSummaries } from "@/lib/mock/runs";
 import { mockIntegrations } from "@/lib/mock/integrations";
@@ -23,6 +27,7 @@ import {
   Database,
   Globe,
   Search,
+  Loader2,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -108,11 +113,105 @@ const checklistItems = [
   { label: "Invite a team member", done: false, href: "/settings" },
 ];
 
+/* ------------------------------------------------------------------ */
+/*  Workspace creation card                                            */
+/* ------------------------------------------------------------------ */
+
+function CreateWorkspaceCard() {
+  const { createWorkspace } = useWorkspace();
+  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCreate() {
+    if (!name.trim()) return;
+    setCreating(true);
+    setError("");
+    const ok = await createWorkspace(name.trim());
+    if (!ok) {
+      setError("Failed to create workspace. Please try again.");
+    }
+    setCreating(false);
+  }
+
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-md border border-hairline bg-surface-card p-8">
+        <div className="flex items-center gap-3">
+          <MascotPlaceholder size="sm" mood="happy" />
+          <div>
+            <h1 className="text-lg font-bold text-ink">Welcome to LLM Flow Studio</h1>
+            <p className="mt-0.5 text-sm text-body">Create a workspace to get started.</p>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <label htmlFor="workspace-name" className="mb-1.5 block text-sm font-medium text-ink">
+            Workspace Name
+          </label>
+          <input
+            id="workspace-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            placeholder="e.g. My Team, Personal"
+            className="flex h-10 w-full items-center rounded-md border border-hairline bg-surface-card px-3 text-sm text-ink placeholder:text-stone focus:border-accent-blue focus:outline-none"
+          />
+          {error && <p className="mt-1.5 text-xs text-accent-red">{error}</p>}
+        </div>
+
+        <Button
+          onClick={handleCreate}
+          disabled={creating || !name.trim()}
+          className="mt-4 w-full"
+        >
+          {creating ? (
+            <>
+              <Loader2 size={16} className="mr-1.5 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <Rocket size={16} className="mr-1.5" />
+              Create Workspace
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ================================================================== */
 /*  Dashboard Page                                                     */
 /* ================================================================== */
 
 export default function DashboardPage() {
+  const { workspace, loading, user } = useWorkspace();
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6">
+        <Loader2 size={24} className="animate-spin text-mute" />
+      </div>
+    );
+  }
+
+  // No workspace — show creation prompt (only if user is logged in)
+  if (!workspace && user) {
+    return <CreateWorkspaceCard />;
+  }
+
+  return <DashboardContent workspaceName={workspace?.name} />;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Dashboard content (separated for clarity)                          */
+/* ------------------------------------------------------------------ */
+
+function DashboardContent({ workspaceName }: { workspaceName?: string }) {
   /* Top 5 workflows for recent list (add a 5th placeholder) */
   const recentWorkflows = [
     ...mockWorkflowSummaries,
@@ -143,7 +242,7 @@ export default function DashboardPage() {
           <MascotPlaceholder size="sm" mood="happy" />
           <div>
             <h1 className="text-xl font-bold text-ink">
-              Good morning, your AI workflows are ready.
+              {workspaceName ? `${workspaceName} Dashboard` : "Good morning, your AI workflows are ready."}
             </h1>
             <p className="mt-0.5 text-sm text-body">
               Create a new workflow, inspect recent runs, or continue from a
