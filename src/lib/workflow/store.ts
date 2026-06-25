@@ -16,7 +16,9 @@ import type { NodeStatus, NodeConfig } from "@/types/workflow";
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const STORAGE_KEY = "llm-flow-studio-workflow";
+const OLD_STORAGE_KEY = "llm-flow-studio-workflow";
+const INDEX_KEY = "llm-flow-studio-workflows";
+const DATA_PREFIX = "llm-flow-studio-wf-";
 
 const edgeStyle = { stroke: "#bfc1b7", strokeWidth: 1.5 };
 const edgeMarker = {
@@ -25,6 +27,107 @@ const edgeMarker = {
   width: 16,
   height: 16,
 };
+
+/* ------------------------------------------------------------------ */
+/*  Multi-workflow localStorage helpers                                */
+/* ------------------------------------------------------------------ */
+
+export interface WorkflowIndexEntry {
+  id: string;
+  name: string;
+  nodeCount: number;
+  edgeCount: number;
+  updatedAt: string;
+}
+
+type WorkflowPayload = {
+  workflowName: string;
+  nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data: WorkflowNode["data"] }>;
+  edges: Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
+};
+
+function generateWorkflowId(): string {
+  return `wf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readIndex(): WorkflowIndexEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(INDEX_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as WorkflowIndexEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function writeIndex(index: WorkflowIndexEntry[]) {
+  try {
+    localStorage.setItem(INDEX_KEY, JSON.stringify(index));
+  } catch { /* quota exceeded */ }
+}
+
+function readWorkflowData(id: string): WorkflowPayload | null {
+  try {
+    const raw = localStorage.getItem(DATA_PREFIX + id);
+    if (!raw) return null;
+    return JSON.parse(raw) as WorkflowPayload;
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkflowData(id: string, payload: WorkflowPayload) {
+  try {
+    localStorage.setItem(DATA_PREFIX + id, JSON.stringify(payload));
+  } catch { /* quota exceeded */ }
+}
+
+function removeWorkflowData(id: string) {
+  try {
+    localStorage.removeItem(DATA_PREFIX + id);
+  } catch { /* ignore */ }
+}
+
+/** Migrate old single-key storage into multi-workflow format */
+function migrateOldStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(OLD_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as WorkflowPayload;
+    if (!parsed?.nodes?.length) {
+      localStorage.removeItem(OLD_STORAGE_KEY);
+      return;
+    }
+    const id = generateWorkflowId();
+    const name = parsed.workflowName || "Untitled Workflow";
+    writeWorkflowData(id, parsed);
+    const index = readIndex();
+    index.push({
+      id,
+      name,
+      nodeCount: parsed.nodes.length,
+      edgeCount: parsed.edges?.length ?? 0,
+      updatedAt: new Date().toISOString(),
+    });
+    writeIndex(index);
+    localStorage.removeItem(OLD_STORAGE_KEY);
+  } catch { /* ignore corrupt data */ }
+}
+
+/** Public helper to list all saved workflows (used by workflows page) */
+export function listSavedWorkflows(): WorkflowIndexEntry[] {
+  migrateOldStorage();
+  return readIndex();
+}
+
+/** Public helper to delete a workflow by ID (used by workflows page) */
+export function deleteSavedWorkflow(id: string) {
+  const index = readIndex().filter((w) => w.id !== id);
+  writeIndex(index);
+  removeWorkflowData(id);
+}
 
 /* ------------------------------------------------------------------ */
 /*  Sample workflow                                                    */
@@ -77,6 +180,7 @@ const sampleEdges: Edge[] = [
 
 interface WorkflowState {
   /* Data */
+  workflowId: string | null;
   workflowName: string;
   nodes: WorkflowNode[];
   edges: Edge[];
@@ -106,9 +210,16 @@ interface WorkflowState {
   /* Workflow name */
   setWorkflowName: (name: string) => void;
 
-  /* Persistence */
+  /* Persistence — multi-workflow */
+  saveWorkflow: () => void;
+  saveWorkflowAs: (name: string) => void;
+  loadWorkflow: (id: string) => void;
+  deleteWorkflow: (id: string) => void;
+
+  /* Legacy compat (used by auto-save) */
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
+
   resetToSampleWorkflow: () => void;
   resetToNewWorkflow: (name?: string) => void;
 }
@@ -119,6 +230,7 @@ interface WorkflowState {
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   /* ── Initial state ──────────────────────────────────────────────── */
+  workflowId: null,
   workflowName: "Contract Review Chain",
   nodes: sampleNodes,
   edges: sampleEdges,
@@ -204,59 +316,115 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   setWorkflowName: (name) => set({ workflowName: name }),
 
-  /* ── Persistence ────────────────────────────────────────────────── */
+  /* ── Multi-workflow persistence ──────────────────────────────────── */
 
-  saveToLocalStorage: () => {
-    const { nodes, edges, workflowName } = get();
-    const payload = {
+  saveWorkflow: () => {
+    const { nodes, edges, workflowName, workflowId } = get();
+    const payload: WorkflowPayload = {
       workflowName,
       nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
       edges: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({
-        id, source, target, sourceHandle, targetHandle,
+        id, source, target, sourceHandle: sourceHandle ?? undefined, targetHandle: targetHandle ?? undefined,
       })),
     };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      /* quota exceeded or SSR — silently ignore */
+
+    if (workflowId) {
+      // Update existing
+      writeWorkflowData(workflowId, payload);
+      const index = readIndex().map((w) =>
+        w.id === workflowId
+          ? { ...w, name: workflowName, nodeCount: nodes.length, edgeCount: edges.length, updatedAt: new Date().toISOString() }
+          : w,
+      );
+      writeIndex(index);
+    } else {
+      // First save — generate new ID
+      const newId = generateWorkflowId();
+      writeWorkflowData(newId, payload);
+      const index = readIndex();
+      index.unshift({
+        id: newId,
+        name: workflowName,
+        nodeCount: nodes.length,
+        edgeCount: edges.length,
+        updatedAt: new Date().toISOString(),
+      });
+      writeIndex(index);
+      set({ workflowId: newId });
+    }
+  },
+
+  saveWorkflowAs: (name) => {
+    const { nodes, edges } = get();
+    const newId = generateWorkflowId();
+    const payload: WorkflowPayload = {
+      workflowName: name,
+      nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
+      edges: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({
+        id, source, target, sourceHandle: sourceHandle ?? undefined, targetHandle: targetHandle ?? undefined,
+      })),
+    };
+    writeWorkflowData(newId, payload);
+    const index = readIndex();
+    index.unshift({
+      id: newId,
+      name,
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+      updatedAt: new Date().toISOString(),
+    });
+    writeIndex(index);
+    set({ workflowId: newId, workflowName: name });
+  },
+
+  loadWorkflow: (id) => {
+    const data = readWorkflowData(id);
+    if (!data || !data.nodes?.length) return;
+    set({
+      workflowId: id,
+      workflowName: data.workflowName ?? "Untitled Workflow",
+      nodes: data.nodes.map((n) => ({
+        ...n,
+        type: n.type ?? "workflow",
+      })) as WorkflowNode[],
+      edges: data.edges.map((e) => ({
+        ...e,
+        type: "deletable",
+        style: edgeStyle,
+        markerEnd: edgeMarker,
+      })),
+      selectedNodeId: null,
+      runStatus: "idle",
+      runEvents: [],
+      nodeOutputs: {},
+    });
+  },
+
+  deleteWorkflow: (id) => {
+    deleteSavedWorkflow(id);
+    if (get().workflowId === id) {
+      get().resetToNewWorkflow();
+    }
+  },
+
+  /* ── Legacy compat (saveToLocalStorage used by auto-save) ────────── */
+
+  saveToLocalStorage: () => {
+    // Redirect to new multi-workflow save, but only if already saved once
+    const { workflowId } = get();
+    if (workflowId) {
+      get().saveWorkflow();
     }
   },
 
   loadFromLocalStorage: () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        workflowName?: string;
-        nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data: WorkflowNode["data"] }>;
-        edges: Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
-      };
-      if (!parsed.nodes?.length) return;
-      set({
-        workflowName: parsed.workflowName ?? "Untitled Workflow",
-        nodes: parsed.nodes.map((n) => ({
-          ...n,
-          type: n.type ?? "workflow",
-        })) as WorkflowNode[],
-        edges: parsed.edges.map((e) => ({
-          ...e,
-          type: "deletable",
-          style: edgeStyle,
-          markerEnd: edgeMarker,
-        })),
-      });
-    } catch {
-      /* corrupt data — silently ignore */
-    }
+    // Migrate old data then no-op (builder page uses loadWorkflow now)
+    migrateOldStorage();
   },
 
   resetToSampleWorkflow: () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
     set({
+      workflowId: null,
       workflowName: "Contract Review Chain",
       nodes: sampleNodes,
       edges: sampleEdges,
@@ -288,12 +456,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       style: edgeStyle,
       markerEnd: edgeMarker,
     };
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
     set({
+      workflowId: null,
       workflowName: name ?? "Untitled Workflow",
       nodes: [inputNode, outputNode],
       edges: [edge],

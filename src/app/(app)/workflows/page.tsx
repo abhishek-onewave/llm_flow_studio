@@ -3,61 +3,26 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, Trash2, ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useWorkflowStore } from "@/lib/workflow/store";
-
-const STORAGE_KEY = "llm-flow-studio-workflow";
-
-interface SavedWorkflow {
-  workflowName: string;
-  nodeCount: number;
-  edgeCount: number;
-}
-
-function readSaved(): SavedWorkflow | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.nodes?.length) {
-      return {
-        workflowName: parsed.workflowName ?? "Untitled Workflow",
-        nodeCount: parsed.nodes.length,
-        edgeCount: parsed.edges?.length ?? 0,
-      };
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
+import { listSavedWorkflows, deleteSavedWorkflow, type WorkflowIndexEntry } from "@/lib/workflow/store";
 
 export default function WorkflowsPage() {
-  const [saved, setSaved] = useState<SavedWorkflow | null>(() => readSaved());
-  const resetNew = useWorkflowStore((s) => s.resetToNewWorkflow);
+  const [workflows, setWorkflows] = useState<WorkflowIndexEntry[]>(() => listSavedWorkflows());
 
-  // Re-read from localStorage when the tab regains focus (user may have edited in builder tab)
+  // Refresh when tab regains focus (user may have saved in builder tab)
   useEffect(() => {
-    const onFocus = () => setSaved(readSaved());
-    window.addEventListener("focus", onFocus);
-    // Also listen for visibilitychange so navigating back refreshes the list
-    const onVisible = () => { if (document.visibilityState === "visible") setSaved(readSaved()); };
+    const refresh = () => setWorkflows(listSavedWorkflows());
+    window.addEventListener("focus", refresh);
+    const onVisible = () => { if (document.visibilityState === "visible") setWorkflows(listSavedWorkflows()); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
-  function handleDelete() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    resetNew();
-    setSaved(null);
+  function handleDelete(id: string) {
+    deleteSavedWorkflow(id);
+    setWorkflows(listSavedWorkflows());
   }
 
   return (
@@ -78,39 +43,52 @@ export default function WorkflowsPage() {
       </div>
 
       {/* Workflow list */}
-      <div className="mt-6">
-        {saved ? (
-          <div className="rounded-md border border-hairline bg-surface-card">
-            <div className="flex items-center justify-between px-4 py-3">
-              <Link href="/workflows/builder" className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80">
-                <div>
-                  <p className="text-sm font-semibold text-ink">{saved.workflowName}</p>
-                  <p className="mt-0.5 text-[11px] text-mute">
-                    {saved.nodeCount} nodes &middot; {saved.edgeCount} connections
-                  </p>
-                </div>
-              </Link>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDelete}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-mute transition-colors hover:bg-accent-red-soft hover:text-accent-red"
-                  title="Delete workflow"
-                  aria-label="Delete workflow"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+      <div className="mt-6 flex flex-col gap-2">
+        {workflows.length > 0 ? (
+          workflows.map((wf) => (
+            <div key={wf.id} className="rounded-md border border-hairline bg-surface-card">
+              <div className="flex items-center justify-between px-4 py-3">
                 <Link
-                  href="/workflows/builder"
-                  className={cn(
-                    "inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium text-body transition-colors hover:bg-surface-soft hover:text-ink",
-                  )}
+                  href={`/workflows/builder?id=${wf.id}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
                 >
-                  Open
-                  <ArrowRight className="h-3 w-3" />
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{wf.name}</p>
+                    <p className="mt-0.5 text-[11px] text-mute">
+                      {wf.nodeCount} nodes &middot; {wf.edgeCount} connections
+                      {wf.updatedAt && (
+                        <>
+                          {" "}&middot;{" "}
+                          {new Date(wf.updatedAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </>
+                      )}
+                    </p>
+                  </div>
                 </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDelete(wf.id)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-mute transition-colors hover:bg-accent-red-soft hover:text-accent-red"
+                    title="Delete workflow"
+                    aria-label="Delete workflow"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <Link
+                    href={`/workflows/builder?id=${wf.id}`}
+                    className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium text-body transition-colors hover:bg-surface-soft hover:text-ink"
+                  >
+                    Open
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
+          ))
         ) : (
           <div className="rounded-md border border-hairline-soft bg-surface-soft px-6 py-10 text-center">
             <p className="text-sm text-mute">No workflows yet. Create your first one to get started.</p>

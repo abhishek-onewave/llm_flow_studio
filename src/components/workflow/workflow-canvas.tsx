@@ -34,19 +34,21 @@ function WorkflowCanvasInner() {
   const onConnect = useWorkflowStore((s) => s.onConnect);
   const selectNode = useWorkflowStore((s) => s.selectNode);
   const addNode = useWorkflowStore((s) => s.addNode);
-  const saveToLocalStorage = useWorkflowStore((s) => s.saveToLocalStorage);
+  const workflowId = useWorkflowStore((s) => s.workflowId);
+  const saveWorkflow = useWorkflowStore((s) => s.saveWorkflow);
 
   const reactFlowInstance = useReactFlow();
 
-  // Auto-save on every change (debounced)
+  // Auto-save on every change (debounced) — only if workflow was already saved once
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
+    if (!workflowId) return; // Don't auto-save unsaved workflows
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      saveToLocalStorage();
+      saveWorkflow();
     }, 500);
     return () => clearTimeout(saveTimer.current);
-  }, [nodes, edges, saveToLocalStorage]);
+  }, [nodes, edges, workflowId, saveWorkflow]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleSelectionChange: OnSelectionChangeFunc = useCallback(

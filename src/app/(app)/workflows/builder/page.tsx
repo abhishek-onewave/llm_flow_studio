@@ -24,7 +24,8 @@ export default function WorkflowBuilderPage() {
 
 function BuilderInner() {
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
-  const load = useWorkflowStore((s) => s.loadFromLocalStorage);
+  const loadWorkflow = useWorkflowStore((s) => s.loadWorkflow);
+  const loadLegacy = useWorkflowStore((s) => s.loadFromLocalStorage);
   const resetNew = useWorkflowStore((s) => s.resetToNewWorkflow);
   const { workspaceId } = useWorkspace();
   const searchParams = useSearchParams();
@@ -36,12 +37,17 @@ function BuilderInner() {
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
+    const workflowId = searchParams.get("id");
     if (searchParams.get("new") === "1") {
       resetNew();
+    } else if (workflowId) {
+      loadWorkflow(workflowId);
     } else {
-      load();
+      // Migrate old data if present, then reset to new
+      loadLegacy();
+      resetNew();
     }
-  }, [searchParams, resetNew, load]);
+  }, [searchParams, resetNew, loadWorkflow, loadLegacy]);
   useEffect(() => { if (workspaceId) setWorkspaceId(workspaceId); }, [workspaceId]);
 
   const closePalette = useCallback(() => setShowPalette(false), []);
