@@ -20,6 +20,7 @@ import {
   X,
   ImageIcon,
 } from "lucide-react";
+import { OpenAIIcon, AnthropicIcon, GeminiIcon, MistralIcon, OpenRouterIcon } from "./brand-icons";
 import type { PaletteItem } from "@/lib/workflow/node-defaults";
 
 /* ------------------------------------------------------------------ */
@@ -31,17 +32,17 @@ interface PaletteEntry extends PaletteItem {
 }
 
 const llmNodes: PaletteEntry[] = [
-  { nodeType: "openai", label: "OpenAI", subtitle: "gpt-4o", icon: <Bot size={14} /> },
-  { nodeType: "anthropic", label: "Claude", subtitle: "claude-sonnet-4", icon: <Sparkles size={14} /> },
-  { nodeType: "google", label: "Gemini", subtitle: "gemini-2.5-pro", icon: <Zap size={14} /> },
-  { nodeType: "mistral", label: "Mistral", subtitle: "mistral-large", icon: <Cpu size={14} /> },
-  { nodeType: "openrouter", label: "OpenRouter", subtitle: "auto", icon: <Boxes size={14} /> },
+  { nodeType: "openai", label: "OpenAI", subtitle: "gpt-4o", icon: <OpenAIIcon size={14} /> },
+  { nodeType: "anthropic", label: "Claude", subtitle: "claude-sonnet-4", icon: <AnthropicIcon size={14} /> },
+  { nodeType: "google", label: "Gemini", subtitle: "gemini-2.5-pro", icon: <GeminiIcon size={14} /> },
+  { nodeType: "mistral", label: "Mistral", subtitle: "mistral-large", icon: <MistralIcon size={14} /> },
+  { nodeType: "openrouter", label: "OpenRouter", subtitle: "auto", icon: <OpenRouterIcon size={14} /> },
   { nodeType: "custom", label: "Custom model", subtitle: "custom-model", icon: <Bot size={14} /> },
 ];
 
 const imageNodes: PaletteEntry[] = [
-  { nodeType: "openai_image", label: "OpenAI Image", subtitle: "DALL-E 3", icon: <ImageIcon size={14} /> },
-  { nodeType: "google_image", label: "Gemini Image", subtitle: "gemini-2.5-flash-image", icon: <ImageIcon size={14} /> },
+  { nodeType: "openai_image", label: "OpenAI Image", subtitle: "DALL-E 3", icon: <OpenAIIcon size={14} /> },
+  { nodeType: "google_image", label: "Gemini Image", subtitle: "gemini-2.5-flash-image", icon: <GeminiIcon size={14} /> },
 ];
 
 const toolNodes: PaletteEntry[] = [

@@ -30,6 +30,7 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { useWorkflowStore } from "@/lib/workflow/store";
+import { OpenAIIcon, AnthropicIcon, GeminiIcon, MistralIcon, OpenRouterIcon, GitHubIcon, VercelIcon } from "./brand-icons";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -76,14 +77,14 @@ const typeIcons: Record<string, React.ReactNode> = {
   input: <FileText size={14} />,
   file_reader: <FileText size={14} />,
   file_writer: <FileOutput size={14} />,
-  openai: <Bot size={14} />,
-  anthropic: <Sparkles size={14} />,
-  google: <Zap size={14} />,
-  mistral: <Cpu size={14} />,
-  openrouter: <Boxes size={14} />,
+  openai: <OpenAIIcon size={14} />,
+  anthropic: <AnthropicIcon size={14} />,
+  google: <GeminiIcon size={14} />,
+  mistral: <MistralIcon size={14} />,
+  openrouter: <OpenRouterIcon size={14} />,
   custom: <Bot size={14} />,
-  github: <GitPullRequest size={14} />,
-  vercel: <Globe size={14} />,
+  github: <GitHubIcon size={14} />,
+  vercel: <VercelIcon size={14} />,
   database: <Database size={14} />,
   http_api: <Code2 size={14} />,
   web_search: <Search size={14} />,
@@ -91,8 +92,8 @@ const typeIcons: Record<string, React.ReactNode> = {
   human_approval: <UserCheck size={14} />,
   condition: <GitBranch size={14} />,
   output: <CircleDot size={14} />,
-  openai_image: <ImageIcon size={14} />,
-  google_image: <ImageIcon size={14} />,
+  openai_image: <OpenAIIcon size={14} />,
+  google_image: <GeminiIcon size={14} />,
 };
 
 const statusChips: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
