@@ -9,6 +9,7 @@ import { topoSort, getDownstream } from "./mock-runner";
 import type { WorkflowNode } from "@/components/workflow/canvas-node";
 
 const LLM_TYPES = new Set(["openai", "anthropic", "google", "mistral", "openrouter", "custom"]);
+const IMAGE_GEN_TYPES = new Set(["openai_image", "google_image"]);
 
 const NON_LLM_OUTPUTS: Record<string, string> = {
   file_reader: `[Document parsed successfully]\nContent extracted and ready for processing.`,
@@ -234,6 +235,64 @@ async function executeNonLLMNode(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Execute an image generation node via /api/image                    */
+/* ------------------------------------------------------------------ */
+
+async function executeImageNode(
+  node: WorkflowNode,
+  signal: AbortSignal,
+  workspaceId: string,
+): Promise<boolean> {
+  const { setNodeStatus } = useWorkflowStore.getState();
+  const config = (node.data as Record<string, unknown>).config as Record<string, unknown> | undefined;
+  const provider = (config?.provider as string) || (node.data.colorKey === "google_image" ? "google" : "openai");
+  const model = (config?.model as string) || "dall-e-3";
+  const size = (config?.size as string) || "1024x1024";
+  const quality = (config?.quality as string) || "standard";
+
+  setNodeStatus(node.id, "running");
+  emitEvent(node.id, node.data.label, "started", `Generating image with ${provider}/${model}...`);
+
+  const prompt = buildPrompt(node);
+  const startTime = Date.now();
+
+  try {
+    const res = await fetch("/api/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, model, prompt, size, quality, workspaceId }),
+      signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((err as { error?: string }).error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const imageUrl = (data as { url?: string }).url;
+    if (!imageUrl) throw new Error("No image URL returned");
+
+    const output = `[image:${imageUrl}]`;
+    useWorkflowStore.setState((s) => ({
+      nodeOutputs: { ...s.nodeOutputs, [node.id]: output },
+    }));
+
+    const durationMs = Date.now() - startTime;
+    setNodeStatus(node.id, "completed");
+    emitEvent(node.id, node.data.label, "completed", `Image generated in ${(durationMs / 1000).toFixed(1)}s.`, { durationMs });
+
+    return true;
+  } catch (err) {
+    if (signal.aborted) return false;
+    const message = err instanceof Error ? err.message : "Unknown error";
+    setNodeStatus(node.id, "error");
+    emitEvent(node.id, node.data.label, "error", `Error: ${message}`);
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Execute a single node (dispatch)                                   */
 /* ------------------------------------------------------------------ */
 
@@ -242,6 +301,9 @@ async function executeSingleNodeReal(
   signal: AbortSignal,
   workspaceId: string,
 ): Promise<boolean> {
+  if (IMAGE_GEN_TYPES.has(node.data.colorKey)) {
+    return executeImageNode(node, signal, workspaceId);
+  }
   if (LLM_TYPES.has(node.data.colorKey)) {
     return executeLLMNode(node, signal, workspaceId);
   }

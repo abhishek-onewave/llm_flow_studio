@@ -99,6 +99,17 @@ export function RunConsole() {
                     >
                       {ev.message}
                     </span>
+                    {ev.type === "completed" && ev.message.includes("Image generated") && (() => {
+                      const outputs = useWorkflowStore.getState().nodeOutputs[ev.nodeId];
+                      if (outputs?.startsWith("[image:")) {
+                        const url = outputs.slice(7, -1);
+                        return (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={url} alt="Generated" className="mt-1 max-h-24 rounded" />
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 ))
               )}

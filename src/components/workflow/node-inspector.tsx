@@ -591,10 +591,29 @@ function OutputPanel({ outputFormat, onConfigChange, nodeId }: OutputPanelProps)
             </span>
           )}
         </div>
-        <div className="rounded-md bg-surface-dark px-4 py-3 max-h-48 overflow-y-auto">
-          <pre className="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-on-dark">
-            {liveOutput || "No output yet. Run this node to see results."}
-          </pre>
+        <div className="rounded-md bg-surface-dark px-4 py-3 max-h-64 overflow-y-auto">
+          {liveOutput.startsWith("[image:") ? (
+            <div className="flex flex-col items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={liveOutput.slice(7, -1)}
+                alt="Generated image"
+                className="max-w-full rounded-md"
+              />
+              <a
+                href={liveOutput.slice(7, -1)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-accent-blue hover:underline"
+              >
+                Open full size
+              </a>
+            </div>
+          ) : (
+            <pre className="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-on-dark">
+              {liveOutput || "No output yet. Run this node to see results."}
+            </pre>
+          )}
         </div>
       </div>
 

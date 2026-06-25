@@ -18,6 +18,7 @@ import {
   Boxes,
   Zap,
   X,
+  ImageIcon,
 } from "lucide-react";
 import type { PaletteItem } from "@/lib/workflow/node-defaults";
 
@@ -36,6 +37,11 @@ const llmNodes: PaletteEntry[] = [
   { nodeType: "mistral", label: "Mistral", subtitle: "mistral-large", icon: <Cpu size={14} /> },
   { nodeType: "openrouter", label: "OpenRouter", subtitle: "auto", icon: <Boxes size={14} /> },
   { nodeType: "custom", label: "Custom model", subtitle: "custom-model", icon: <Bot size={14} /> },
+];
+
+const imageNodes: PaletteEntry[] = [
+  { nodeType: "openai_image", label: "OpenAI Image", subtitle: "DALL-E 3", icon: <ImageIcon size={14} /> },
+  { nodeType: "google_image", label: "Gemini Image", subtitle: "Imagen", icon: <ImageIcon size={14} /> },
 ];
 
 const toolNodes: PaletteEntry[] = [
@@ -126,6 +132,7 @@ export function NodePalette({ className, onClose }: NodePaletteProps = {}) {
         )}
       </div>
       <PaletteSection title="LLMs" nodes={llmNodes} />
+      <PaletteSection title="Image Gen" nodes={imageNodes} />
       <PaletteSection title="Tools" nodes={toolNodes} />
       <PaletteSection title="Logic" nodes={logicNodes} />
     </div>

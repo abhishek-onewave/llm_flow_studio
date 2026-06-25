@@ -44,6 +44,16 @@ const defaults: Record<string, Omit<WorkflowNodeData, "label" | "subtitle" | "co
     config: { provider: "custom", model: "custom-model", instructions: "", promptTemplate: "{{input}}", temperature: 0.7, maxTokens: 4096, outputFormat: "text" },
   },
 
+  /* Image generation nodes */
+  openai_image: {
+    status: "idle",
+    config: { provider: "openai", model: "dall-e-3", promptTemplate: "{{input}}", size: "1024x1024", quality: "standard", outputType: "image" },
+  },
+  google_image: {
+    status: "idle",
+    config: { provider: "google", model: "gemini-2.0-flash-preview-image-generation", promptTemplate: "{{input}}", size: "1024x1024", quality: "standard", outputType: "image" },
+  },
+
   /* Tool nodes */
   file_reader: {
     status: "idle",

@@ -27,6 +27,7 @@ import {
   UserCheck,
   GitBranch,
   Trash2,
+  ImageIcon,
 } from "lucide-react";
 import { useWorkflowStore } from "@/lib/workflow/store";
 
@@ -67,6 +68,8 @@ const typeColors: Record<string, string> = {
   human_approval: "#f7a501",
   condition: "#cd4239",
   output: "#f7a501",
+  openai_image: "#2c8c66",
+  google_image: "#2c84e0",
 };
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -88,6 +91,8 @@ const typeIcons: Record<string, React.ReactNode> = {
   human_approval: <UserCheck size={14} />,
   condition: <GitBranch size={14} />,
   output: <CircleDot size={14} />,
+  openai_image: <ImageIcon size={14} />,
+  google_image: <ImageIcon size={14} />,
 };
 
 const statusChips: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
